@@ -1,0 +1,8 @@
+
+{
+  "name": "Jery Sculpture Studio",
+  "description": "A professional, multilingual portfolio and admin dashboard for a sculptor, featuring gallery management, AI-assisted translations, and direct order integration.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
