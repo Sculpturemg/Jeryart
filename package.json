@@ -10,15 +10,15 @@
     "start": "vite preview --host 0.0.0.0 --port 1337"
   },
   "dependencies": {
-    "@google/generative-ai": "^1.31.0",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
-    "react-router-dom": "^7.10.1"
+    "@google/generative-ai": "^0.21.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.22.3"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "^5.8.2",
-    "vite": "^6.2.0"
+    "@types/node": "^22.0.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.2.0"
   }
 }
