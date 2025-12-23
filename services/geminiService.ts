@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Language, LocalizedText } from "../types";
 
 /**
@@ -9,7 +9,7 @@ export const generateTranslations = async (sourceText: string, sourceLang: Langu
   try {
     // Creating a new GoogleGenAI instance for each request as per guidelines for key handling.
     // The API key is obtained exclusively from process.env.API_KEY.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+   const ai = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
     
     // Using gemini-3-flash-preview for translation tasks as it is well-suited for high-quality text processing.
     const response = await ai.models.generateContent({
