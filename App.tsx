@@ -421,33 +421,35 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
 
       <main>{MainContent()}</main>
 
-      <footer className="py-20 bg-stone-900 text-stone-100 px-6 border-t border-stone-800">
+     <footer className="py-20 bg-stone-900 text-stone-100 px-6 border-t border-stone-800">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
           <div><h5 className="text-2xl font-serif tracking-[0.4em] mb-6">JERY</h5><p className="text-stone-500 text-xs font-light">{content.heroSubtitle[lang]}</p></div>
           <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Menu</h6><ul className="text-xs space-y-3 font-light"><li className="cursor-pointer" onClick={() => setView('home')}>Accueil</li><li className="cursor-pointer" onClick={() => setView('gallery')}>Galerie</li><li className="cursor-pointer" onClick={() => setView('blog')}>Journal</li></ul></div>
           <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Contact</h6><div className="flex justify-center md:justify-start gap-6 text-xl"><a href={content.contactInfo.facebook} target="_blank"><i className="fab fa-facebook-f"></i></a><a href={`https://wa.me/${content.contactInfo.whatsapp}`} target="_blank"><i className="fab fa-whatsapp"></i></a><a href={`mailto:${content.contactInfo.email}`}><i className="far fa-envelope"></i></a></div></div>
         </div>
         <p className="mt-20 text-center text-stone-600 text-[10px] uppercase tracking-[0.5em]">© {new Date().getFullYear()} JERY SCULPTURES MADAGASCAR</p>
-    </footer>
+      </footer>
+
       {/* Système de Zoom universel */}
       {selectedImg && (
-  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-    <div className="relative">
-      <img
-        src={selectedImg}
-        className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
-        alt="Sculpture zoomée"
-      />
-  <button
-            onClick={() => setSelectedImg(null)}
-            className="absolute top-4 right-4 text-white text-4xl hover:text-gray-300"
-          >
-            &times;
-          </button>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="relative">
+            <img
+              src={selectedImg}
+              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
+              alt="Sculpture zoomée"
+            />
+            <button
+              onClick={() => setSelectedImg(null)}
+              className="absolute top-4 right-4 text-white text-4xl hover:text-gray-300"
+            >
+              &times;
+            </button>
+          </div>
         </div>
-      )
-      </div>
-    );
+      )}
+    </div>
+  );
 };
 
 export default App;
