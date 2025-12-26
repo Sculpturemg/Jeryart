@@ -437,11 +437,11 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
         >
           <img 
             src={selectedImg} 
-            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300" 
+            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
             alt="Sculpture zoomée"
           />
           <button className="absolute top-6 right-6 text-white text-4xl">&times;</button>
-         </div>
+        </div>
       )}
     </div>
   );
