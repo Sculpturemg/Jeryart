@@ -1,13 +1,25 @@
+const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Language, Sculpture, SiteContent, BlogPost, LocalizedText } from './types';
-import { INITIAL_CONTENT, UI_TRANSLATIONS, INITIAL_SCULPTURES, INITIAL_BLOG_POSTS, EUR_TO_MGA } from './constants';
-import * as DataService from './services/dataService';
-import { generateTranslations } from './services/geminiService';
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', 'jery_art'); // <--- Mettez ici le nom choisi à l'étape 1
 
-const App: React.FC = () => {
-  // --- States ---
-  const [lang, setLang] = useState<Language>(Language.FR);
+  try {
+    // Remplacez 'VOTRE_CLOUD_NAME' ci-dessous par votre vrai Cloud Name de l'étape 2
+    const response = await fetch('https://api.cloudinary.com/v1_1/dnbd36uqz/image/upload', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await response.json();
+    if (data.secure_url) {
+      callback(data.secure_url);
+    }
+  } catch (error) {
+    alert("Erreur lors de l'envoi de l'image sur Cloudinary");
+  }
+};
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isAdmin, setIsAdmin] = useState(false);
   const [view, setView] = useState<'home' | 'gallery' | 'blog' | 'admin'>('home');
