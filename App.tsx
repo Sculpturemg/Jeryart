@@ -312,7 +312,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
     );
   };
 
-  // --- Main Render Logic ---
+ // --- Main Render Logic ---
   const MainContent = () => {
     switch (view) {
       case 'gallery':
