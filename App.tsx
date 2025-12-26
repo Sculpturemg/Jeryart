@@ -438,7 +438,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
         className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
         alt="Sculpture zoomée"
       />
-   <button
+  <button
             onClick={() => setSelectedImg(null)}
             className="absolute top-4 right-4 text-white text-4xl hover:text-gray-300"
           >
@@ -446,9 +446,8 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
           </button>
         </div>
       )
-      }
-    </div>
-  );
+      </div>
+    );
 };
 
 export default App;
