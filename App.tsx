@@ -14,6 +14,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [passwordInput, setPasswordInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [selectedImg, setSelectedImg] = useState<string | null>(null);
   
   // Data States
   const [sculptures, setSculptures] = useState<Sculpture[]>([]);
