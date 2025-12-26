@@ -421,7 +421,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
 
       <main>{MainContent()}</main>
 
-     <footer className="py-20 bg-stone-900 text-stone-100 px-6 border-t border-stone-800">
+      <footer className="py-20 bg-stone-900 text-stone-100 px-6 border-t border-stone-800">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
           <div><h5 className="text-2xl font-serif tracking-[0.4em] mb-6">JERY</h5><p className="text-stone-500 text-xs font-light">{content.heroSubtitle[lang]}</p></div>
           <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Menu</h6><ul className="text-xs space-y-3 font-light"><li className="cursor-pointer" onClick={() => setView('home')}>Accueil</li><li className="cursor-pointer" onClick={() => setView('gallery')}>Galerie</li><li className="cursor-pointer" onClick={() => setView('blog')}>Journal</li></ul></div>
@@ -430,7 +430,6 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
         <p className="mt-20 text-center text-stone-600 text-[10px] uppercase tracking-[0.5em]">© {new Date().getFullYear()} JERY SCULPTURES MADAGASCAR</p>
       </footer>
 
-      {/* Système de Zoom universel */}
       {selectedImg && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
           <div className="relative">
