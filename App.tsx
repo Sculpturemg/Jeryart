@@ -445,7 +445,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
             &times;
           </button>
         </div>
-      }
+      )}
     </div>
   );
 };
