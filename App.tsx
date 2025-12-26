@@ -428,7 +428,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
           <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Contact</h6><div className="flex justify-center md:justify-start gap-6 text-xl"><a href={content.contactInfo.facebook} target="_blank"><i className="fab fa-facebook-f"></i></a><a href={`https://wa.me/${content.contactInfo.whatsapp}`} target="_blank"><i className="fab fa-whatsapp"></i></a><a href={`mailto:${content.contactInfo.email}`}><i className="far fa-envelope"></i></a></div></div>
         </div>
         <p className="mt-20 text-center text-stone-600 text-[10px] uppercase tracking-[0.5em]">© {new Date().getFullYear()} JERY SCULPTURES MADAGASCAR</p>
-      </footer>
+    </footer>
       {/* Système de Zoom universel */}
       {selectedImg && (
         <div 
@@ -441,10 +441,10 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
             alt="Sculpture zoomée"
           />
           <button className="absolute top-6 right-6 text-white text-4xl">&times;</button>
-        </div>
-      )}
-    </div>
-  );
-};
+          </div>
+        )}
+      </div>
+    );
+  };
 
-export default App;
+  export default App;
