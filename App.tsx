@@ -85,15 +85,6 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => callback(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
   const saveToStorage = (key: string, data: any) => {
     localStorage.setItem(key, JSON.stringify(data));
   };
@@ -455,5 +446,4 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
     </div>
   );
 };
-
 export default App;
