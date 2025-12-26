@@ -1,25 +1,81 @@
-const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+import React, { useState, useEffect, useRef } from 'react';
 
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', 'jery_art'); // <--- Mettez ici le nom choisi à l'étape 1
+// --- Types & Interfaces ---
+type Language = 'fr' | 'mg' | 'en' | 'ru';
+type LocalizedText = { [key in Language]?: string };
 
-  try {
-    // Remplacez 'VOTRE_CLOUD_NAME' ci-dessous par votre vrai Cloud Name de l'étape 2
-    const response = await fetch('https://api.cloudinary.com/v1_1/dnbd36uqz/image/upload', {
-      method: 'POST',
-      body: formData
-    });
-    const data = await response.json();
-    if (data.secure_url) {
-      callback(data.secure_url);
-    }
-  } catch (error) {
-    alert("Erreur lors de l'envoi de l'image sur Cloudinary");
-  }
+interface Sculpture {
+  id: string;
+  title: LocalizedText;
+  description: LocalizedText;
+  price: number;
+  category: string;
+  imageUrl: string;
+  available: boolean;
+  createdAt: string;
+}
+
+interface BlogPost {
+  id: string;
+  title: LocalizedText;
+  content: LocalizedText;
+  imageUrl: string;
+  date: string;
+}
+
+interface SiteContent {
+  heroTitle: LocalizedText;
+  heroSubtitle: LocalizedText;
+  heroImageUrl: string;
+  aboutText: LocalizedText;
+  commission: { title: LocalizedText; desc: LocalizedText };
+  contactInfo: { whatsapp: string; facebook: string; email: string };
+}
+
+// --- Constantes & Mock Data ---
+const EUR_TO_MGA = 4800; // Taux approximatif
+
+const INITIAL_CONTENT: SiteContent = {
+  heroTitle: { fr: "L'Âme du Bois", mg: "Ny Fanahin'ny Hazo", en: "Soul of Wood", ru: "Душа Дерева" },
+  heroSubtitle: { fr: "Sculptures Uniques à Madagascar", mg: "Sary Sokitra miavaka eto Madagasikara", en: "Unique Sculptures in Madagascar", ru: "Уникальные скульптуры на Мадагаскаре" },
+  heroImageUrl: "https://images.unsplash.com/photo-1544531586-fde5298cdd40?q=80&w=1920",
+  aboutText: { fr: "Bienvenue dans mon atelier...", mg: "Tongasoa eto amin'ny atelioko...", en: "Welcome to my studio...", ru: "Добро пожаловать..." },
+  commission: { 
+    title: { fr: "Commandes Sur Mesure", mg: "Komandy Manokana", en: "Custom Orders", ru: "Индивидуальные заказы" }, 
+    desc: { fr: "Créez votre pièce unique...", mg: "Mamorona ny sary sokitrao...", en: "Create your unique piece...", ru: "Создайте свою уникальную..." } 
+  },
+  contactInfo: { whatsapp: "261340000000", facebook: "https://facebook.com", email: "contact@jery.mg" }
 };
+
+const INITIAL_SCULPTURES: Sculpture[] = [];
+const INITIAL_BLOG_POSTS: BlogPost[] = [];
+
+const UI_TRANSLATIONS: Record<string, any> = {
+  fr: { nav: { home: "Accueil", gallery: "Galerie", blog: "Journal" }, gallery: { title: "Collection", unavailable: "Vendu", order: "Commander" }, blog: { title: "Journal d'Atelier" } },
+  mg: { nav: { home: "Fandraisana", gallery: "Tahiry", blog: "Vaovao" }, gallery: { title: "Tahiry", unavailable: "Lafo", order: "Hanafatra" }, blog: { title: "Drafitr'asa" } },
+  en: { nav: { home: "Home", gallery: "Gallery", blog: "Journal" }, gallery: { title: "Collection", unavailable: "Sold Out", order: "Order" }, blog: { title: "Studio Journal" } },
+  ru: { nav: { home: "Главная", gallery: "Галерея", blog: "Журнал" }, gallery: { title: "Коллекция", unavailable: "Продано", order: "Заказать" }, blog: { title: "Журнал студии" } }
+};
+
+// --- Mock DataService (Simulation de la BDD pour éviter les erreurs) ---
+const DataService = {
+  getSculptures: async () => JSON.parse(localStorage.getItem('jery_local_sculptures') || '[]'),
+  getContent: async () => JSON.parse(localStorage.getItem('jery_local_content') || 'null'),
+  getBlogPosts: async () => JSON.parse(localStorage.getItem('jery_local_blog') || '[]'),
+  saveContent: (data: any) => localStorage.setItem('jery_local_content', JSON.stringify(data)),
+  getAdminPassword: () => localStorage.getItem('jery_admin_pass') || 'admin123',
+  saveAdminPassword: (pass: string) => localStorage.setItem('jery_admin_pass', pass),
+};
+
+const generateTranslations = async (text: string) => ({ fr: text, mg: text + " (MG)", en: text + " (EN)", ru: text + " (RU)" });
+
+
+// =============================================================================
+// COMPOSANT PRINCIPAL APP
+// =============================================================================
+const App = () => {
+  // --- States ---
+  const [lang, setLang] = useState<any>('fr'); 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isAdmin, setIsAdmin] = useState(false);
   const [view, setView] = useState<'home' | 'gallery' | 'blog' | 'admin'>('home');
@@ -38,14 +94,63 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const t = UI_TRANSLATIONS[lang];
+  const t = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS['fr'];
 
+  // --- Helpers ---
   const formatPriceDisplay = (priceInEuro: number) => {
     const mga = (priceInEuro * EUR_TO_MGA).toLocaleString('fr-MG');
     return `${mga} Ar (${priceInEuro} €)`;
   };
 
-  // --- Initial Load ---
+  // VOS PARAMÈTRES CLOUDINARY SONT ICI 👇
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'jery_art'); 
+
+    try {
+      const response = await fetch('https://api.cloudinary.com/v1_1/dnbd36uqz/image/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await response.json();
+      if (data.secure_url) {
+        callback(data.secure_url);
+      }
+    } catch (error) {
+      alert("Erreur lors de l'envoi de l'image sur Cloudinary");
+    }
+  };
+
+  const saveToStorage = (key: string, data: any) => {
+    localStorage.setItem(key, JSON.stringify(data));
+  };
+
+  const handleChangePassword = () => {
+    if (!newPassword || newPassword.length < 4) {
+      alert("Le mot de passe doit faire au moins 4 caractères.");
+      return;
+    }
+    DataService.saveAdminPassword(newPassword);
+    alert("Mot de passe modifié avec succès !");
+    setNewPassword('');
+  };
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const currentPass = DataService.getAdminPassword();
+    if (passwordInput.trim() === currentPass) {
+      setIsAdmin(true);
+      setPasswordInput('');
+    } else {
+      alert("Mot de passe incorrect.");
+    }
+  };
+
+  // --- Effects ---
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
@@ -67,39 +172,12 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
     init();
   }, []);
 
-  // SEO Update
   useEffect(() => {
     const title = content.heroTitle[lang] || "Jery Sculpture";
     document.title = `JERY | ${title}`;
   }, [lang, content]);
 
-  // --- Handlers ---
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const currentPass = DataService.getAdminPassword();
-    if (passwordInput.trim() === currentPass) {
-      setIsAdmin(true);
-      setPasswordInput('');
-    } else {
-      alert("Mot de passe incorrect.");
-    }
-  };
-
-  const saveToStorage = (key: string, data: any) => {
-    localStorage.setItem(key, JSON.stringify(data));
-  };
-
-  const handleChangePassword = () => {
-    if (!newPassword || newPassword.length < 4) {
-      alert("Le mot de passe doit faire au moins 4 caractères.");
-      return;
-    }
-    DataService.saveAdminPassword(newPassword);
-    alert("Mot de passe modifié avec succès !");
-    setNewPassword('');
-  };
-
-  // --- Admin Components ---
+  // --- Sub-Components ---
   const LocalizedInput = ({ label, value, onChange, isTextArea = false }: { label: string, value: LocalizedText, onChange: (val: LocalizedText) => void, isTextArea?: boolean }) => {
     const handleTranslate = async () => {
       if (!value.fr) return;
@@ -411,7 +489,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
           </div>
           <div className="flex items-center gap-4">
             <select value={lang} onChange={(e) => setLang(e.target.value as Language)} className="bg-transparent text-[10px] font-bold border rounded p-1">
-              {Object.values(Language).map(l => <option key={l} value={l} className="dark:bg-stone-900">{l.toUpperCase()}</option>)}
+              {Object.values({fr:'fr', mg:'mg', en:'en', ru:'ru'}).map(l => <option key={l} value={l} className="dark:bg-stone-900">{l.toUpperCase()}</option>)}
             </select>
             <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="p-2 bg-stone-100 dark:bg-stone-800 rounded-full">{theme === 'light' ? '🌙' : '☀️'}</button>
             <button onClick={() => setView(view === 'admin' ? 'home' : 'admin')} className="md:hidden">⚙️</button>
@@ -430,6 +508,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
         <p className="mt-20 text-center text-stone-600 text-[10px] uppercase tracking-[0.5em]">© {new Date().getFullYear()} JERY SCULPTURES MADAGASCAR</p>
       </footer>
 
+      {/* Système de Zoom universel */}
       {selectedImg && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
           <div className="relative">
