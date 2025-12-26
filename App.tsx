@@ -441,9 +441,10 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
             alt="Sculpture zoomée"
           />
           <button className="absolute top-6 right-6 text-white text-4xl">&times;</button>
-          </div>
-        )}
-      );
-    };
+        </div>
+      )}
+    </div>
+  );
+};
 
-  export default App;
+export default App;
