@@ -125,9 +125,14 @@ const App = () => {
     }
   };
 
-  const saveToStorage = (key: string, data: any) => {
-    localStorage.setItem(key, JSON.stringify(data));
-  };
+ const saveToStorage = async (key: string, data: any) => {
+  localStorage.setItem(key, JSON.stringify(data));
+  try {
+    await DataService.saveData(data);
+  } catch (error) {
+    console.error("Erreur de synchronisation", error);
+  }
+};
 
   const handleChangePassword = () => {
     if (!newPassword || newPassword.length < 4) {
