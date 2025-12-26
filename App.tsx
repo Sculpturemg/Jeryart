@@ -431,21 +431,22 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback
     </footer>
       {/* Système de Zoom universel */}
       {selectedImg && (
-        <div 
-          className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center p-4 cursor-zoom-out"
-          onClick={() => setSelectedImg(null)}
-        >
-          <img 
-            src={selectedImg} 
-            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
-            alt="Sculpture zoomée"
-          />
-          <button className="absolute top-6 right-6 text-white text-4xl">&times;</button>
-        </div>
-      )}
+  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+    <div className="relative">
+      <img
+        src={selectedImg}
+        className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
+        alt="Sculpture zoomée"
+      />
+      <button
+        className="absolute top-6 right-6 text-white text-4xl"
+        onClick={() => setSelectedImg(null)}
+      >
+        &times;
+      </button>
     </div>
-  );
-}
+  </div>
+)}
 
 export default App;
 
