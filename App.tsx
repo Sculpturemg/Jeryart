@@ -320,7 +320,7 @@ const App: React.FC = () => {
               {sculptures.map(s => (
                 <div key={s.id} className="group">
                   <div className="relative overflow-hidden aspect-square mb-6 bg-stone-200 dark:bg-stone-800 rounded-lg">
-                    <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+                    <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer" onClick={() => setSelectedImg(s.imageUrl)} />
                     {!s.available && <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] px-3 py-1 font-bold">{t.gallery.unavailable}</div>}
                   </div>
                   <h4 className="text-xl font-serif mb-2">{s.title[lang]}</h4>
@@ -426,6 +426,20 @@ const App: React.FC = () => {
         </div>
         <p className="mt-20 text-center text-stone-600 text-[10px] uppercase tracking-[0.5em]">© {new Date().getFullYear()} JERY SCULPTURES MADAGASCAR</p>
       </footer>
+      {/* Système de Zoom universel */}
+      {selectedImg && (
+        <div 
+          className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setSelectedImg(null)}
+        >
+          <img 
+            src={selectedImg} 
+            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300" 
+            alt="Sculpture zoomée"
+          />
+          <button className="absolute top-6 right-6 text-white text-4xl">&times;</button>
+        </div>
+      )}
     </div>
   );
 };
