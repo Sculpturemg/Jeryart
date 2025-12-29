@@ -57,7 +57,7 @@ const UI_TRANSLATIONS: Record<string, any> = {
   ru: { nav: { home: "Главная", gallery: "Галерея", blog: "Журнал" }, gallery: { title: "Коллекция", unavailable: "Продано", order: "Заказать" }, blog: { title: "Журнал студии" } }
 };
 
-// --- Mock DataService (Simulation de la BDD pour éviter les erreurs) ---
+// --- Mock DataService ---
 const DataService = {
   getSculptures: async () => JSON.parse(localStorage.getItem('jery_local_sculptures') || '[]'),
   getContent: async () => JSON.parse(localStorage.getItem('jery_local_content') || 'null'),
@@ -69,6 +69,54 @@ const DataService = {
 
 const generateTranslations = async (text: string) => ({ fr: text, mg: text + " (MG)", en: text + " (EN)", ru: text + " (RU)" });
 
+// --- Composant Input Optimisé (Sorti de App pour éviter les lags) ---
+const LocalizedInput = ({ 
+  label, 
+  value, 
+  onChange, 
+  setIsLoading, 
+  isTextArea = false 
+}: { 
+  label: string, 
+  value: LocalizedText, 
+  onChange: (val: LocalizedText) => void, 
+  setIsLoading: (v: boolean) => void,
+  isTextArea?: boolean 
+}) => {
+  const handleTranslate = async () => {
+    if (!value.fr) return;
+    setIsLoading(true);
+    try {
+      const translated = await generateTranslations(value.fr);
+      onChange(translated);
+    } catch (e) {
+      alert("Erreur IA");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="mb-6 p-4 border border-stone-200 dark:border-stone-800 rounded-lg bg-stone-50 dark:bg-stone-900/50">
+      <div className="flex justify-between items-center mb-4">
+        <label className="text-[10px] uppercase tracking-widest font-bold text-gold-600">{label}</label>
+        <button type="button" onClick={handleTranslate} className="text-[10px] bg-gold-600 text-white px-3 py-1 rounded hover:bg-gold-700">TRADUIRE ✨</button>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {(['fr', 'mg', 'en', 'ru'] as const).map(l => (
+          <div key={l}>
+            <span className="text-[9px] uppercase font-mono text-stone-400">{l}</span>
+            {isTextArea ? (
+              <textarea className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700" value={value[l] || ''} onChange={e => onChange({...value, [l]: e.target.value})} rows={3} />
+            ) : (
+              <input type="text" className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700" value={value[l] || ''} onChange={e => onChange({...value, [l]: e.target.value})} />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // =============================================================================
 // COMPOSANT PRINCIPAL APP
@@ -102,7 +150,6 @@ const App = () => {
     return `${mga} Ar (${priceInEuro} €)`;
   };
 
-  // VOS PARAMÈTRES CLOUDINARY SONT ICI 👇
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -125,14 +172,9 @@ const App = () => {
     }
   };
 
- const saveToStorage = async (key: string, data: any) => {
-  localStorage.setItem(key, JSON.stringify(data));
-  try {
-    await DataService.saveData(data);
-  } catch (error) {
-    console.error("Erreur de synchronisation", error);
-  }
-};
+  const saveToStorage = (key: string, data: any) => {
+    localStorage.setItem(key, JSON.stringify(data));
+  };
 
   const handleChangePassword = () => {
     if (!newPassword || newPassword.length < 4) {
@@ -182,43 +224,6 @@ const App = () => {
     document.title = `JERY | ${title}`;
   }, [lang, content]);
 
-  // --- Sub-Components ---
-  const LocalizedInput = ({ label, value, onChange, isTextArea = false }: { label: string, value: LocalizedText, onChange: (val: LocalizedText) => void, isTextArea?: boolean }) => {
-    const handleTranslate = async () => {
-      if (!value.fr) return;
-      setIsLoading(true);
-      try {
-        const translated = await generateTranslations(value.fr);
-        onChange(translated);
-      } catch (e) {
-        alert("Erreur IA");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    return (
-      <div className="mb-6 p-4 border border-stone-200 dark:border-stone-800 rounded-lg bg-stone-50 dark:bg-stone-900/50">
-        <div className="flex justify-between items-center mb-4">
-          <label className="text-[10px] uppercase tracking-widest font-bold text-gold-600">{label}</label>
-          <button type="button" onClick={handleTranslate} className="text-[10px] bg-gold-600 text-white px-3 py-1 rounded hover:bg-gold-700">TRADUIRE ✨</button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(['fr', 'mg', 'en', 'ru'] as const).map(l => (
-            <div key={l}>
-              <span className="text-[9px] uppercase font-mono text-stone-400">{l}</span>
-              {isTextArea ? (
-                <textarea className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700" value={value[l] || ''} onChange={e => onChange({...value, [l]: e.target.value})} rows={3} />
-              ) : (
-                <input type="text" className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700" value={value[l] || ''} onChange={e => onChange({...value, [l]: e.target.value})} />
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
   const AdminPanel = () => {
     const [activeTab, setActiveTab] = useState<'general' | 'sculptures' | 'journal'>('general');
 
@@ -248,13 +253,13 @@ const App = () => {
                     <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={e => handleFileUpload(e, (url) => setContent({...content, heroImageUrl: url}))} />
                  </div>
                </div>
-               <LocalizedInput label="Titre Principal" value={content.heroTitle} onChange={v => setContent({...content, heroTitle: v})} />
-               <LocalizedInput label="Sous-titre" value={content.heroSubtitle} onChange={v => setContent({...content, heroSubtitle: v})} />
+               <LocalizedInput setIsLoading={setIsLoading} label="Titre Principal" value={content.heroTitle} onChange={v => setContent({...content, heroTitle: v})} />
+               <LocalizedInput setIsLoading={setIsLoading} label="Sous-titre" value={content.heroSubtitle} onChange={v => setContent({...content, heroSubtitle: v})} />
              </div>
 
              <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
                <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">HISTOIRE & À PROPOS</h3>
-               <LocalizedInput label="Texte Biographie" value={content.aboutText} onChange={v => setContent({...content, aboutText: v})} isTextArea />
+               <LocalizedInput setIsLoading={setIsLoading} label="Texte Biographie" value={content.aboutText} onChange={v => setContent({...content, aboutText: v})} isTextArea />
              </div>
 
              <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
@@ -329,8 +334,8 @@ const App = () => {
                       {editingSculpture.imageUrl && <img src={editingSculpture.imageUrl} className="mt-2 w-20 h-20 object-cover rounded border" />}
                     </div>
                   </div>
-                  <LocalizedInput label="Titre de l'œuvre" value={editingSculpture.title} onChange={v => setEditingSculpture({...editingSculpture, title: v})} />
-                  <LocalizedInput label="Description" value={editingSculpture.description} onChange={v => setEditingSculpture({...editingSculpture, description: v})} isTextArea />
+                  <LocalizedInput setIsLoading={setIsLoading} label="Titre de l'œuvre" value={editingSculpture.title} onChange={v => setEditingSculpture({...editingSculpture, title: v})} />
+                  <LocalizedInput setIsLoading={setIsLoading} label="Description" value={editingSculpture.description} onChange={v => setEditingSculpture({...editingSculpture, description: v})} isTextArea />
                   <div className="flex justify-end gap-4 mt-8">
                     <button onClick={() => setEditingSculpture(null)} className="px-6 py-2 text-xs font-bold uppercase">Annuler</button>
                     <button onClick={() => {
@@ -375,8 +380,8 @@ const App = () => {
                     <label className="text-[10px] font-bold uppercase block mb-2">Photo de l'article</label>
                     <input type="file" accept="image/*" onChange={e => handleFileUpload(e, (url) => setEditingPost({...editingPost, imageUrl: url}))} />
                   </div>
-                  <LocalizedInput label="Titre de l'article" value={editingPost.title} onChange={v => setEditingPost({...editingPost, title: v})} />
-                  <LocalizedInput label="Contenu du texte" value={editingPost.content} onChange={v => setEditingPost({...editingPost, content: v})} isTextArea />
+                  <LocalizedInput setIsLoading={setIsLoading} label="Titre de l'article" value={editingPost.title} onChange={v => setEditingPost({...editingPost, title: v})} />
+                  <LocalizedInput setIsLoading={setIsLoading} label="Contenu du texte" value={editingPost.content} onChange={v => setEditingPost({...editingPost, content: v})} isTextArea />
                   <div className="flex justify-end gap-4 mt-8">
                     <button onClick={() => setEditingPost(null)} className="px-6 py-2 text-xs font-bold uppercase">Annuler</button>
                     <button onClick={() => {
