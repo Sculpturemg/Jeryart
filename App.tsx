@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-// --- Types & Interfaces ---
+// =============================================================================
+// TYPES & INTERFACES
+// =============================================================================
 type Language = 'fr' | 'mg' | 'en' | 'ru';
 type LocalizedText = { [key in Language]?: string };
 
@@ -32,8 +34,10 @@ interface SiteContent {
   contactInfo: { whatsapp: string; facebook: string; email: string };
 }
 
-// --- Constantes & Mock Data ---
-const EUR_TO_MGA = 4800; // Taux approximatif
+// =============================================================================
+// DONNÉES INITIALES
+// =============================================================================
+const EUR_TO_MGA = 4800;
 
 const INITIAL_CONTENT: SiteContent = {
   heroTitle: { fr: "L'Âme du Bois", mg: "Ny Fanahin'ny Hazo", en: "Soul of Wood", ru: "Душа Дерева" },
@@ -57,7 +61,9 @@ const UI_TRANSLATIONS: Record<string, any> = {
   ru: { nav: { home: "Главная", gallery: "Галерея", blog: "Журнал" }, gallery: { title: "Коллекция", unavailable: "Продано", order: "Заказать" }, blog: { title: "Журнал студии" } }
 };
 
-// --- Mock DataService ---
+// =============================================================================
+// SERVICES (Mock)
+// =============================================================================
 const DataService = {
   getSculptures: async () => JSON.parse(localStorage.getItem('jery_local_sculptures') || '[]'),
   getContent: async () => JSON.parse(localStorage.getItem('jery_local_content') || 'null'),
@@ -69,7 +75,9 @@ const DataService = {
 
 const generateTranslations = async (text: string) => ({ fr: text, mg: text + " (MG)", en: text + " (EN)", ru: text + " (RU)" });
 
-// --- Composant Input Optimisé (Sorti de App pour éviter les lags) ---
+// =============================================================================
+// COMPOSANT INPUT (ISOLÉ POUR LA PERFORMANCE)
+// =============================================================================
 const LocalizedInput = ({ 
   label, 
   value, 
@@ -107,9 +115,19 @@ const LocalizedInput = ({
           <div key={l}>
             <span className="text-[9px] uppercase font-mono text-stone-400">{l}</span>
             {isTextArea ? (
-              <textarea className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700" value={value[l] || ''} onChange={e => onChange({...value, [l]: e.target.value})} rows={3} />
+              <textarea 
+                className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700 focus:border-gold-600 focus:ring-1 focus:ring-gold-600 outline-none transition-all" 
+                value={value[l] || ''} 
+                onChange={e => onChange({...value, [l]: e.target.value})} 
+                rows={3} 
+              />
             ) : (
-              <input type="text" className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700" value={value[l] || ''} onChange={e => onChange({...value, [l]: e.target.value})} />
+              <input 
+                type="text" 
+                className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700 focus:border-gold-600 focus:ring-1 focus:ring-gold-600 outline-none transition-all" 
+                value={value[l] || ''} 
+                onChange={e => onChange({...value, [l]: e.target.value})} 
+              />
             )}
           </div>
         ))}
@@ -122,22 +140,25 @@ const LocalizedInput = ({
 // COMPOSANT PRINCIPAL APP
 // =============================================================================
 const App = () => {
-  // --- States ---
+  // --- States Globaux ---
   const [lang, setLang] = useState<any>('fr'); 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isAdmin, setIsAdmin] = useState(false);
   const [view, setView] = useState<'home' | 'gallery' | 'blog' | 'admin'>('home');
+  const [adminTab, setAdminTab] = useState<'general' | 'sculptures' | 'journal'>('general'); // State remonté ici
   const [isLoading, setIsLoading] = useState(true);
+  
+  // --- States Formulaires Admin ---
   const [passwordInput, setPasswordInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [selectedImg, setSelectedImg] = useState<string | null>(null);
   
-  // Data States
+  // --- States Données ---
   const [sculptures, setSculptures] = useState<Sculpture[]>([]);
   const [content, setContent] = useState<SiteContent>(INITIAL_CONTENT);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   
-  // Admin UI States
+  // --- States Édition ---
   const [editingSculpture, setEditingSculpture] = useState<Sculpture | null>(null);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -224,240 +245,37 @@ const App = () => {
     document.title = `JERY | ${title}`;
   }, [lang, content]);
 
-  const AdminPanel = () => {
-    const [activeTab, setActiveTab] = useState<'general' | 'sculptures' | 'journal'>('general');
-
-    return (
-      <div className="max-w-5xl mx-auto py-12 px-6 animate-fade-in">
-        <div className="flex justify-between items-center mb-10 border-b pb-4 dark:border-stone-800">
-          <h2 className="text-2xl font-serif tracking-widest uppercase text-gold-600">PANEL ARTISTE</h2>
-          <button onClick={() => setIsAdmin(false)} className="text-[10px] font-bold text-red-500 uppercase tracking-widest border border-red-500 px-4 py-1 rounded">Déconnexion</button>
+  // =============================================================================
+  // RENDU
+  // =============================================================================
+  return (
+    <div className={`min-h-screen transition-colors duration-300 ${theme === 'dark' ? 'dark bg-stone-900 text-stone-100' : 'bg-stone-50 text-stone-900'}`}>
+      
+      {/* NAVIGATION */}
+      <nav className="sticky top-0 z-50 bg-stone-50/90 dark:bg-stone-900/90 backdrop-blur-md border-b dark:border-stone-800 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <h1 className="text-2xl font-serif tracking-[0.4em] font-bold cursor-pointer" onClick={() => setView('home')}>JERY</h1>
+          <div className="hidden md:flex gap-8 text-[10px] uppercase tracking-widest font-bold">
+            <button onClick={() => setView('home')} className={view === 'home' ? 'text-gold-600 border-b-2 border-gold-600' : ''}>{t.nav.home}</button>
+            <button onClick={() => setView('gallery')} className={view === 'gallery' ? 'text-gold-600 border-b-2 border-gold-600' : ''}>{t.nav.gallery}</button>
+            <button onClick={() => setView('blog')} className={view === 'blog' ? 'text-gold-600 border-b-2 border-gold-600' : ''}>{t.nav.blog}</button>
+            <button onClick={() => setView('admin')} className={view === 'admin' ? 'text-gold-600 border-b-2 border-gold-600' : ''}>ADMIN</button>
+          </div>
+          <div className="flex items-center gap-4">
+            <select value={lang} onChange={(e) => setLang(e.target.value)} className="bg-transparent text-[10px] font-bold border rounded p-1">
+              {Object.values({fr:'fr', mg:'mg', en:'en', ru:'ru'}).map(l => <option key={l} value={l} className="dark:bg-stone-900">{l.toUpperCase()}</option>)}
+            </select>
+            <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="p-2 bg-stone-100 dark:bg-stone-800 rounded-full">{theme === 'light' ? '🌙' : '☀️'}</button>
+            <button onClick={() => setView(view === 'admin' ? 'home' : 'admin')} className="md:hidden">⚙️</button>
+          </div>
         </div>
+      </nav>
 
-        <div className="flex gap-4 mb-10 overflow-x-auto pb-2">
-          {(['general', 'sculptures', 'journal'] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2 text-[10px] uppercase font-bold tracking-widest border rounded-full transition-all flex-shrink-0 ${activeTab === tab ? 'bg-stone-800 text-white dark:bg-stone-100 dark:text-stone-900' : 'border-stone-200 dark:border-stone-700'}`}>
-              {tab === 'general' ? 'Réglages & Contact' : tab === 'sculptures' ? 'Ma Galerie' : 'Mon Journal'}
-            </button>
-          ))}
-        </div>
-
-        {activeTab === 'general' && (
-          <div className="space-y-8 animate-fade-in pb-20">
-             <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
-               <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">HÉROS & ACCUEIL</h3>
-               <div className="flex flex-col md:flex-row gap-6 items-center mb-8">
-                 <img src={content.heroImageUrl} className="w-48 h-32 object-cover rounded-lg shadow-md border" />
-                 <div className="flex-1 w-full">
-                    <button onClick={() => fileInputRef.current?.click()} className="w-full p-4 border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-lg text-stone-400 font-bold text-xs uppercase hover:text-gold-600">Changer l'image d'accueil</button>
-                    <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={e => handleFileUpload(e, (url) => setContent({...content, heroImageUrl: url}))} />
-                 </div>
-               </div>
-               <LocalizedInput setIsLoading={setIsLoading} label="Titre Principal" value={content.heroTitle} onChange={v => setContent({...content, heroTitle: v})} />
-               <LocalizedInput setIsLoading={setIsLoading} label="Sous-titre" value={content.heroSubtitle} onChange={v => setContent({...content, heroSubtitle: v})} />
-             </div>
-
-             <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
-               <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">HISTOIRE & À PROPOS</h3>
-               <LocalizedInput setIsLoading={setIsLoading} label="Texte Biographie" value={content.aboutText} onChange={v => setContent({...content, aboutText: v})} isTextArea />
-             </div>
-
-             <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
-               <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">RÉSEAUX & CONTACTS</h3>
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                 <div>
-                   <label className="text-[10px] font-bold uppercase mb-2 block">WhatsApp (261...)</label>
-                   <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.whatsapp} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, whatsapp: e.target.value}})} />
-                 </div>
-                 <div>
-                   <label className="text-[10px] font-bold uppercase mb-2 block">Facebook (Lien complet)</label>
-                   <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.facebook} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, facebook: e.target.value}})} />
-                 </div>
-                 <div>
-                   <label className="text-[10px] font-bold uppercase mb-2 block">Email Professionnel</label>
-                   <input type="email" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.email} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, email: e.target.value}})} />
-                 </div>
-               </div>
-             </div>
-
-             <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
-               <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">SÉCURITÉ</h3>
-               <div className="max-w-xs">
-                 <label className="text-[10px] font-bold uppercase mb-2 block">Nouveau Mot de Passe</label>
-                 <div className="flex gap-2">
-                   <input type="password" placeholder="Min. 4 caractères" className="flex-1 p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-                   <button onClick={handleChangePassword} className="bg-stone-800 dark:bg-stone-200 text-white dark:text-stone-900 px-4 py-2 rounded font-bold text-[10px] uppercase">Modifier</button>
-                 </div>
-               </div>
-             </div>
-
-             <div className="flex justify-end sticky bottom-4 z-10">
-               <button onClick={() => { DataService.saveContent(content); alert("Modifications enregistrées !"); }} className="bg-stone-800 dark:bg-stone-100 text-white dark:text-stone-900 px-12 py-4 rounded-full font-bold uppercase text-xs tracking-widest shadow-2xl">Enregistrer Tout le Site</button>
-             </div>
-          </div>
-        )}
-
-        {activeTab === 'sculptures' && (
-          <div className="space-y-6 animate-fade-in pb-20">
-            <button onClick={() => setEditingSculpture({ id: '', title: {fr:'',mg:'',en:'',ru:''}, description: {fr:'',mg:'',en:'',ru:''}, price: 0, category: 'Wood', imageUrl: '', available: true, createdAt: new Date().toISOString() })} className="w-full p-10 border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-2xl text-stone-400 hover:text-gold-600 transition-all font-bold uppercase tracking-widest">+ Ajouter une Sculpture</button>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sculptures.map(s => (
-                <div key={s.id} className="bg-white dark:bg-stone-800 rounded-xl shadow-sm border dark:border-stone-700 overflow-hidden group">
-                  <img src={s.imageUrl} className="w-full h-48 object-cover group-hover:opacity-90" />
-                  <div className="p-4">
-                    <p className="font-bold truncate text-lg">{s.title.fr}</p>
-                    <p className="text-xs text-gold-600 font-bold mb-4">{formatPriceDisplay(s.price)}</p>
-                    <div className="flex justify-between border-t pt-3">
-                      <button onClick={() => setEditingSculpture(s)} className="text-[10px] font-bold uppercase text-blue-500 hover:text-blue-600">Modifier</button>
-                      <button onClick={() => { if(confirm("Supprimer?")) { const l = sculptures.filter(x => x.id !== s.id); setSculptures(l); saveToStorage('jery_local_sculptures', l); }}} className="text-[10px] font-bold uppercase text-red-500 hover:text-red-600">Supprimer</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {editingSculpture && (
-              <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-white dark:bg-stone-800 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-2xl shadow-2xl">
-                  <div className="flex justify-between items-center mb-6 border-b pb-2">
-                    <h3 className="text-xl font-serif uppercase tracking-widest">Détails de l'œuvre</h3>
-                    <button onClick={() => setEditingSculpture(null)} className="text-xl">×</button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="text-[10px] font-bold uppercase block mb-2">Prix en Euro (€)</label>
-                      <input type="number" className="w-full p-3 border rounded dark:bg-stone-900" value={editingSculpture.price} onChange={e => setEditingSculpture({...editingSculpture, price: Number(e.target.value)})} />
-                      <p className="text-[10px] text-gold-600 mt-2 font-bold">Valeur en Ariary : {formatPriceDisplay(editingSculpture.price)}</p>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold uppercase block mb-2">Image</label>
-                      <input type="file" accept="image/*" className="w-full text-xs" onChange={e => handleFileUpload(e, (url) => setEditingSculpture({...editingSculpture, imageUrl: url}))} />
-                      {editingSculpture.imageUrl && <img src={editingSculpture.imageUrl} className="mt-2 w-20 h-20 object-cover rounded border" />}
-                    </div>
-                  </div>
-                  <LocalizedInput setIsLoading={setIsLoading} label="Titre de l'œuvre" value={editingSculpture.title} onChange={v => setEditingSculpture({...editingSculpture, title: v})} />
-                  <LocalizedInput setIsLoading={setIsLoading} label="Description" value={editingSculpture.description} onChange={v => setEditingSculpture({...editingSculpture, description: v})} isTextArea />
-                  <div className="flex justify-end gap-4 mt-8">
-                    <button onClick={() => setEditingSculpture(null)} className="px-6 py-2 text-xs font-bold uppercase">Annuler</button>
-                    <button onClick={() => {
-                      const newList = editingSculpture.id ? sculptures.map(x => x.id === editingSculpture.id ? editingSculpture : x) : [...sculptures, {...editingSculpture, id: Date.now().toString()}];
-                      setSculptures(newList);
-                      saveToStorage('jery_local_sculptures', newList);
-                      setEditingSculpture(null);
-                    }} className="bg-gold-600 text-white px-10 py-3 rounded-full font-bold uppercase text-xs">Sauvegarder</button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'journal' && (
-          <div className="space-y-6 animate-fade-in pb-20">
-            <button onClick={() => setEditingPost({ id: '', title: {fr:'',mg:'',en:'',ru:''}, content: {fr:'',mg:'',en:'',ru:''}, imageUrl: '', date: new Date().toISOString() })} className="w-full p-10 border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-2xl text-stone-400 hover:text-gold-600 font-bold uppercase tracking-widest">+ Rédiger un Article</button>
-            <div className="grid grid-cols-1 gap-4">
-              {blogPosts.map(p => (
-                <div key={p.id} className="flex gap-4 p-4 bg-white dark:bg-stone-800 rounded-xl shadow-sm border dark:border-stone-700 items-center">
-                  <img src={p.imageUrl} className="w-24 h-24 object-cover rounded-lg" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold truncate text-lg">{p.title.fr}</p>
-                    <p className="text-[10px] text-stone-400 uppercase">{new Date(p.date).toLocaleDateString()}</p>
-                    <div className="flex gap-4 mt-2">
-                      <button onClick={() => setEditingPost(p)} className="text-[10px] font-bold uppercase text-blue-500">Modifier</button>
-                      <button onClick={() => { if(confirm("Supprimer?")) { const l = blogPosts.filter(x => x.id !== p.id); setBlogPosts(l); saveToStorage('jery_local_blog', l); }}} className="text-[10px] font-bold uppercase text-red-500">Supprimer</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {editingPost && (
-              <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-white dark:bg-stone-800 w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 rounded-2xl">
-                  <div className="flex justify-between items-center mb-6 border-b pb-2">
-                    <h3 className="text-xl font-serif uppercase tracking-widest">Journal d'atelier</h3>
-                    <button onClick={() => setEditingPost(null)} className="text-xl">×</button>
-                  </div>
-                  <div className="mb-6">
-                    <label className="text-[10px] font-bold uppercase block mb-2">Photo de l'article</label>
-                    <input type="file" accept="image/*" onChange={e => handleFileUpload(e, (url) => setEditingPost({...editingPost, imageUrl: url}))} />
-                  </div>
-                  <LocalizedInput setIsLoading={setIsLoading} label="Titre de l'article" value={editingPost.title} onChange={v => setEditingPost({...editingPost, title: v})} />
-                  <LocalizedInput setIsLoading={setIsLoading} label="Contenu du texte" value={editingPost.content} onChange={v => setEditingPost({...editingPost, content: v})} isTextArea />
-                  <div className="flex justify-end gap-4 mt-8">
-                    <button onClick={() => setEditingPost(null)} className="px-6 py-2 text-xs font-bold uppercase">Annuler</button>
-                    <button onClick={() => {
-                      const newList = editingPost.id ? blogPosts.map(x => x.id === editingPost.id ? editingPost : x) : [...blogPosts, {...editingPost, id: Date.now().toString()}];
-                      setBlogPosts(newList);
-                      saveToStorage('jery_local_blog', newList);
-                      setEditingPost(null);
-                    }} className="bg-gold-600 text-white px-10 py-3 rounded-full font-bold uppercase text-xs">Publier l'article</button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // --- Main Render Logic ---
-  const MainContent = () => {
-    switch (view) {
-      case 'gallery':
-        return (
-          <div className="py-24 px-6 max-w-7xl mx-auto animate-fade-in">
-            <h2 className="text-3xl md:text-4xl font-serif text-center mb-20 uppercase tracking-[0.4em]">{t.gallery.title}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16">
-              {sculptures.map(s => (
-                <div key={s.id} className="group">
-                  <div className="relative overflow-hidden aspect-square mb-6 bg-stone-200 dark:bg-stone-800 rounded-lg">
-                    <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer" onClick={() => setSelectedImg(s.imageUrl)} />
-                    {!s.available && <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] px-3 py-1 font-bold">{t.gallery.unavailable}</div>}
-                  </div>
-                  <h4 className="text-xl font-serif mb-2">{s.title[lang]}</h4>
-                  <div className="flex flex-col border-t border-stone-200 dark:border-stone-800 pt-4">
-                    <span className="text-lg font-bold mb-2">{formatPriceDisplay(s.price)}</span>
-                    <button onClick={() => window.open(`https://wa.me/${content.contactInfo.whatsapp}?text=Bonjour Jery, je suis intéressé par : ${s.title[lang]}`, '_blank')} className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold-600 border-b border-gold-600 self-start hover:text-gold-500">{t.gallery.order}</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      case 'blog':
-        return (
-          <div className="py-24 px-6 max-w-5xl mx-auto animate-fade-in">
-            <h2 className="text-3xl md:text-5xl font-serif text-center mb-16 uppercase tracking-[0.4em]">{t.blog.title}</h2>
-            <div className="space-y-24">
-              {blogPosts.map(p => (
-                <article key={p.id} className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center group">
-                  <div className="overflow-hidden rounded-lg aspect-video md:aspect-square">
-                    <img src={p.imageUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                  </div>
-                  <div className="space-y-6">
-                    <span className="text-[10px] font-bold text-gold-600 uppercase tracking-widest">{new Date(p.date).toLocaleDateString()}</span>
-                    <h3 className="text-3xl font-serif">{p.title[lang]}</h3>
-                    <p className="text-stone-600 dark:text-stone-400 leading-relaxed whitespace-pre-line font-light">{p.content[lang]}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        );
-      case 'admin':
-        return isAdmin ? <AdminPanel /> : (
-          <div className="max-w-md mx-auto py-32 px-6">
-            <div className="bg-white dark:bg-stone-800 p-8 rounded-2xl shadow-2xl border dark:border-stone-700 text-center">
-              <h2 className="text-3xl font-serif uppercase tracking-widest mb-10">ADMINISTRATION</h2>
-              <form onSubmit={handleLogin} className="space-y-6">
-                <input type="password" placeholder="MOT DE PASSE" className="w-full p-4 bg-stone-100 dark:bg-stone-900 border dark:border-stone-700 rounded-lg text-center font-bold tracking-[0.5em]" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} />
-                <button type="submit" className="w-full py-4 bg-stone-800 dark:bg-stone-100 text-white dark:text-stone-900 font-bold uppercase tracking-widest rounded-lg hover:bg-gold-600 hover:text-white transition-all">Connexion</button>
-              </form>
-            </div>
-          </div>
-        );
-      default:
-        return (
+      {/* CONTENU PRINCIPAL */}
+      <main>
+        
+        {/* VUE: ACCUEIL */}
+        {view === 'home' && (
           <>
             <header className="relative h-[85vh] flex items-center justify-center overflow-hidden">
               <img src={content.heroImageUrl} className="absolute inset-0 w-full h-full object-cover opacity-60 dark:opacity-40" />
@@ -482,32 +300,239 @@ const App = () => {
                 </div>
             </section>
           </>
-        );
-    }
-  };
+        )}
 
-  return (
-    <div className={`min-h-screen transition-colors duration-300 ${theme === 'dark' ? 'dark bg-stone-900 text-stone-100' : 'bg-stone-50 text-stone-900'}`}>
-      <nav className="sticky top-0 z-50 bg-stone-50/90 dark:bg-stone-900/90 backdrop-blur-md border-b dark:border-stone-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-serif tracking-[0.4em] font-bold cursor-pointer" onClick={() => setView('home')}>JERY</h1>
-          <div className="hidden md:flex gap-8 text-[10px] uppercase tracking-widest font-bold">
-            <button onClick={() => setView('home')} className={view === 'home' ? 'text-gold-600 border-b-2 border-gold-600' : ''}>{t.nav.home}</button>
-            <button onClick={() => setView('gallery')} className={view === 'gallery' ? 'text-gold-600 border-b-2 border-gold-600' : ''}>{t.nav.gallery}</button>
-            <button onClick={() => setView('blog')} className={view === 'blog' ? 'text-gold-600 border-b-2 border-gold-600' : ''}>{t.nav.blog}</button>
-            <button onClick={() => setView('admin')} className={view === 'admin' ? 'text-gold-600 border-b-2 border-gold-600' : ''}>ADMIN</button>
+        {/* VUE: GALERIE */}
+        {view === 'gallery' && (
+          <div className="py-24 px-6 max-w-7xl mx-auto animate-fade-in">
+            <h2 className="text-3xl md:text-4xl font-serif text-center mb-20 uppercase tracking-[0.4em]">{t.gallery.title}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16">
+              {sculptures.map(s => (
+                <div key={s.id} className="group">
+                  <div className="relative overflow-hidden aspect-square mb-6 bg-stone-200 dark:bg-stone-800 rounded-lg">
+                    <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer" onClick={() => setSelectedImg(s.imageUrl)} />
+                    {!s.available && <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] px-3 py-1 font-bold">{t.gallery.unavailable}</div>}
+                  </div>
+                  <h4 className="text-xl font-serif mb-2">{s.title[lang]}</h4>
+                  <div className="flex flex-col border-t border-stone-200 dark:border-stone-800 pt-4">
+                    <span className="text-lg font-bold mb-2">{formatPriceDisplay(s.price)}</span>
+                    <button onClick={() => window.open(`https://wa.me/${content.contactInfo.whatsapp}?text=Bonjour Jery, je suis intéressé par : ${s.title[lang]}`, '_blank')} className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold-600 border-b border-gold-600 self-start hover:text-gold-500">{t.gallery.order}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <select value={lang} onChange={(e) => setLang(e.target.value as Language)} className="bg-transparent text-[10px] font-bold border rounded p-1">
-              {Object.values({fr:'fr', mg:'mg', en:'en', ru:'ru'}).map(l => <option key={l} value={l} className="dark:bg-stone-900">{l.toUpperCase()}</option>)}
-            </select>
-            <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="p-2 bg-stone-100 dark:bg-stone-800 rounded-full">{theme === 'light' ? '🌙' : '☀️'}</button>
-            <button onClick={() => setView(view === 'admin' ? 'home' : 'admin')} className="md:hidden">⚙️</button>
-          </div>
-        </div>
-      </nav>
+        )}
 
-      <main>{MainContent()}</main>
+        {/* VUE: JOURNAL */}
+        {view === 'blog' && (
+          <div className="py-24 px-6 max-w-5xl mx-auto animate-fade-in">
+            <h2 className="text-3xl md:text-5xl font-serif text-center mb-16 uppercase tracking-[0.4em]">{t.blog.title}</h2>
+            <div className="space-y-24">
+              {blogPosts.map(p => (
+                <article key={p.id} className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center group">
+                  <div className="overflow-hidden rounded-lg aspect-video md:aspect-square">
+                    <img src={p.imageUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  </div>
+                  <div className="space-y-6">
+                    <span className="text-[10px] font-bold text-gold-600 uppercase tracking-widest">{new Date(p.date).toLocaleDateString()}</span>
+                    <h3 className="text-3xl font-serif">{p.title[lang]}</h3>
+                    <p className="text-stone-600 dark:text-stone-400 leading-relaxed whitespace-pre-line font-light">{p.content[lang]}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* VUE: ADMIN */}
+        {view === 'admin' && (
+          !isAdmin ? (
+            <div className="max-w-md mx-auto py-32 px-6">
+              <div className="bg-white dark:bg-stone-800 p-8 rounded-2xl shadow-2xl border dark:border-stone-700 text-center">
+                <h2 className="text-3xl font-serif uppercase tracking-widest mb-10">ADMINISTRATION</h2>
+                <form onSubmit={handleLogin} className="space-y-6">
+                  <input type="password" placeholder="MOT DE PASSE" className="w-full p-4 bg-stone-100 dark:bg-stone-900 border dark:border-stone-700 rounded-lg text-center font-bold tracking-[0.5em]" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} />
+                  <button type="submit" className="w-full py-4 bg-stone-800 dark:bg-stone-100 text-white dark:text-stone-900 font-bold uppercase tracking-widest rounded-lg hover:bg-gold-600 hover:text-white transition-all">Connexion</button>
+                </form>
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-5xl mx-auto py-12 px-6 animate-fade-in">
+              <div className="flex justify-between items-center mb-10 border-b pb-4 dark:border-stone-800">
+                <h2 className="text-2xl font-serif tracking-widest uppercase text-gold-600">PANEL ARTISTE</h2>
+                <button onClick={() => setIsAdmin(false)} className="text-[10px] font-bold text-red-500 uppercase tracking-widest border border-red-500 px-4 py-1 rounded">Déconnexion</button>
+              </div>
+
+              <div className="flex gap-4 mb-10 overflow-x-auto pb-2">
+                {(['general', 'sculptures', 'journal'] as const).map(tab => (
+                  <button key={tab} onClick={() => setAdminTab(tab)} className={`px-6 py-2 text-[10px] uppercase font-bold tracking-widest border rounded-full transition-all flex-shrink-0 ${adminTab === tab ? 'bg-stone-800 text-white dark:bg-stone-100 dark:text-stone-900' : 'border-stone-200 dark:border-stone-700'}`}>
+                    {tab === 'general' ? 'Réglages & Contact' : tab === 'sculptures' ? 'Ma Galerie' : 'Mon Journal'}
+                  </button>
+                ))}
+              </div>
+
+              {/* ONGLET GÉNÉRAL */}
+              {adminTab === 'general' && (
+                <div className="space-y-8 animate-fade-in pb-20">
+                  <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
+                    <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">HÉROS & ACCUEIL</h3>
+                    <div className="flex flex-col md:flex-row gap-6 items-center mb-8">
+                      <img src={content.heroImageUrl} className="w-48 h-32 object-cover rounded-lg shadow-md border" />
+                      <div className="flex-1 w-full">
+                          <button onClick={() => fileInputRef.current?.click()} className="w-full p-4 border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-lg text-stone-400 font-bold text-xs uppercase hover:text-gold-600">Changer l'image d'accueil</button>
+                          <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={e => handleFileUpload(e, (url) => setContent({...content, heroImageUrl: url}))} />
+                      </div>
+                    </div>
+                    <LocalizedInput setIsLoading={setIsLoading} label="Titre Principal" value={content.heroTitle} onChange={v => setContent({...content, heroTitle: v})} />
+                    <LocalizedInput setIsLoading={setIsLoading} label="Sous-titre" value={content.heroSubtitle} onChange={v => setContent({...content, heroSubtitle: v})} />
+                  </div>
+
+                  <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
+                    <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">HISTOIRE & À PROPOS</h3>
+                    <LocalizedInput setIsLoading={setIsLoading} label="Texte Biographie" value={content.aboutText} onChange={v => setContent({...content, aboutText: v})} isTextArea />
+                  </div>
+
+                  <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
+                    <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">RÉSEAUX & CONTACTS</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase mb-2 block">WhatsApp (261...)</label>
+                        <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.whatsapp} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, whatsapp: e.target.value}})} />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase mb-2 block">Facebook (Lien complet)</label>
+                        <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.facebook} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, facebook: e.target.value}})} />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase mb-2 block">Email Professionnel</label>
+                        <input type="email" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.email} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, email: e.target.value}})} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
+                    <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">SÉCURITÉ</h3>
+                    <div className="max-w-xs">
+                      <label className="text-[10px] font-bold uppercase mb-2 block">Nouveau Mot de Passe</label>
+                      <div className="flex gap-2">
+                        <input type="password" placeholder="Min. 4 caractères" className="flex-1 p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                        <button onClick={handleChangePassword} className="bg-stone-800 dark:bg-stone-200 text-white dark:text-stone-900 px-4 py-2 rounded font-bold text-[10px] uppercase">Modifier</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end sticky bottom-4 z-10">
+                    <button onClick={() => { DataService.saveContent(content); alert("Modifications enregistrées !"); }} className="bg-stone-800 dark:bg-stone-100 text-white dark:text-stone-900 px-12 py-4 rounded-full font-bold uppercase text-xs tracking-widest shadow-2xl">Enregistrer Tout le Site</button>
+                  </div>
+                </div>
+              )}
+
+              {/* ONGLET SCULPTURES */}
+              {adminTab === 'sculptures' && (
+                <div className="space-y-6 animate-fade-in pb-20">
+                  <button onClick={() => setEditingSculpture({ id: '', title: {fr:'',mg:'',en:'',ru:''}, description: {fr:'',mg:'',en:'',ru:''}, price: 0, category: 'Wood', imageUrl: '', available: true, createdAt: new Date().toISOString() })} className="w-full p-10 border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-2xl text-stone-400 hover:text-gold-600 transition-all font-bold uppercase tracking-widest">+ Ajouter une Sculpture</button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {sculptures.map(s => (
+                      <div key={s.id} className="bg-white dark:bg-stone-800 rounded-xl shadow-sm border dark:border-stone-700 overflow-hidden group">
+                        <img src={s.imageUrl} className="w-full h-48 object-cover group-hover:opacity-90" />
+                        <div className="p-4">
+                          <p className="font-bold truncate text-lg">{s.title.fr}</p>
+                          <p className="text-xs text-gold-600 font-bold mb-4">{formatPriceDisplay(s.price)}</p>
+                          <div className="flex justify-between border-t pt-3">
+                            <button onClick={() => setEditingSculpture(s)} className="text-[10px] font-bold uppercase text-blue-500 hover:text-blue-600">Modifier</button>
+                            <button onClick={() => { if(confirm("Supprimer?")) { const l = sculptures.filter(x => x.id !== s.id); setSculptures(l); saveToStorage('jery_local_sculptures', l); }}} className="text-[10px] font-bold uppercase text-red-500 hover:text-red-600">Supprimer</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {editingSculpture && (
+                    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                      <div className="bg-white dark:bg-stone-800 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-2xl shadow-2xl">
+                        <div className="flex justify-between items-center mb-6 border-b pb-2">
+                          <h3 className="text-xl font-serif uppercase tracking-widest">Détails de l'œuvre</h3>
+                          <button onClick={() => setEditingSculpture(null)} className="text-xl">×</button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                          <div>
+                            <label className="text-[10px] font-bold uppercase block mb-2">Prix en Euro (€)</label>
+                            <input type="number" className="w-full p-3 border rounded dark:bg-stone-900" value={editingSculpture.price} onChange={e => setEditingSculpture({...editingSculpture, price: Number(e.target.value)})} />
+                            <p className="text-[10px] text-gold-600 mt-2 font-bold">Valeur en Ariary : {formatPriceDisplay(editingSculpture.price)}</p>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold uppercase block mb-2">Image</label>
+                            <input type="file" accept="image/*" className="w-full text-xs" onChange={e => handleFileUpload(e, (url) => setEditingSculpture({...editingSculpture, imageUrl: url}))} />
+                            {editingSculpture.imageUrl && <img src={editingSculpture.imageUrl} className="mt-2 w-20 h-20 object-cover rounded border" />}
+                          </div>
+                        </div>
+                        <LocalizedInput setIsLoading={setIsLoading} label="Titre de l'œuvre" value={editingSculpture.title} onChange={v => setEditingSculpture({...editingSculpture, title: v})} />
+                        <LocalizedInput setIsLoading={setIsLoading} label="Description" value={editingSculpture.description} onChange={v => setEditingSculpture({...editingSculpture, description: v})} isTextArea />
+                        <div className="flex justify-end gap-4 mt-8">
+                          <button onClick={() => setEditingSculpture(null)} className="px-6 py-2 text-xs font-bold uppercase">Annuler</button>
+                          <button onClick={() => {
+                            const newList = editingSculpture.id ? sculptures.map(x => x.id === editingSculpture.id ? editingSculpture : x) : [...sculptures, {...editingSculpture, id: Date.now().toString()}];
+                            setSculptures(newList);
+                            saveToStorage('jery_local_sculptures', newList);
+                            setEditingSculpture(null);
+                          }} className="bg-gold-600 text-white px-10 py-3 rounded-full font-bold uppercase text-xs">Sauvegarder</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ONGLET JOURNAL */}
+              {adminTab === 'journal' && (
+                <div className="space-y-6 animate-fade-in pb-20">
+                  <button onClick={() => setEditingPost({ id: '', title: {fr:'',mg:'',en:'',ru:''}, content: {fr:'',mg:'',en:'',ru:''}, imageUrl: '', date: new Date().toISOString() })} className="w-full p-10 border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-2xl text-stone-400 hover:text-gold-600 font-bold uppercase tracking-widest">+ Rédiger un Article</button>
+                  <div className="grid grid-cols-1 gap-4">
+                    {blogPosts.map(p => (
+                      <div key={p.id} className="flex gap-4 p-4 bg-white dark:bg-stone-800 rounded-xl shadow-sm border dark:border-stone-700 items-center">
+                        <img src={p.imageUrl} className="w-24 h-24 object-cover rounded-lg" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold truncate text-lg">{p.title.fr}</p>
+                          <p className="text-[10px] text-stone-400 uppercase">{new Date(p.date).toLocaleDateString()}</p>
+                          <div className="flex gap-4 mt-2">
+                            <button onClick={() => setEditingPost(p)} className="text-[10px] font-bold uppercase text-blue-500">Modifier</button>
+                            <button onClick={() => { if(confirm("Supprimer?")) { const l = blogPosts.filter(x => x.id !== p.id); setBlogPosts(l); saveToStorage('jery_local_blog', l); }}} className="text-[10px] font-bold uppercase text-red-500">Supprimer</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {editingPost && (
+                    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                      <div className="bg-white dark:bg-stone-800 w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 rounded-2xl">
+                        <div className="flex justify-between items-center mb-6 border-b pb-2">
+                          <h3 className="text-xl font-serif uppercase tracking-widest">Journal d'atelier</h3>
+                          <button onClick={() => setEditingPost(null)} className="text-xl">×</button>
+                        </div>
+                        <div className="mb-6">
+                          <label className="text-[10px] font-bold uppercase block mb-2">Photo de l'article</label>
+                          <input type="file" accept="image/*" onChange={e => handleFileUpload(e, (url) => setEditingPost({...editingPost, imageUrl: url}))} />
+                        </div>
+                        <LocalizedInput setIsLoading={setIsLoading} label="Titre de l'article" value={editingPost.title} onChange={v => setEditingPost({...editingPost, title: v})} />
+                        <LocalizedInput setIsLoading={setIsLoading} label="Contenu du texte" value={editingPost.content} onChange={v => setEditingPost({...editingPost, content: v})} isTextArea />
+                        <div className="flex justify-end gap-4 mt-8">
+                          <button onClick={() => setEditingPost(null)} className="px-6 py-2 text-xs font-bold uppercase">Annuler</button>
+                          <button onClick={() => {
+                            const newList = editingPost.id ? blogPosts.map(x => x.id === editingPost.id ? editingPost : x) : [...blogPosts, {...editingPost, id: Date.now().toString()}];
+                            setBlogPosts(newList);
+                            saveToStorage('jery_local_blog', newList);
+                            setEditingPost(null);
+                          }} className="bg-gold-600 text-white px-10 py-3 rounded-full font-bold uppercase text-xs">Publier l'article</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        )}
+      </main>
 
       <footer className="py-20 bg-stone-900 text-stone-100 px-6 border-t border-stone-800">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
