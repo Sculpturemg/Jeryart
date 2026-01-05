@@ -3,12 +3,13 @@ import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, child } from "firebase/database";
 
 // =============================================================================
-// ⚠️ CONFIGURATION FIREBASE (TES CLÉS SONT DÉJÀ MISES ICI)
+// ⚠️ CONFIGURATION FIREBASE (CORRIGÉE AVEC TON LIEN EUROPE)
 // =============================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyBawOErCFdDYLa3tP1oWqGO3OazsXLUD5U",
   authDomain: "jery-art-a1dfc.firebaseapp.com",
-  databaseURL: "https://jery-art-a1dfc-default-rtdb.firebaseio.com", // J'ai déduit ce lien, il est standard
+  // 👇 LE LIEN EXACT DE TON IMAGE (EUROPE)
+  databaseURL: "https://jery-art-a1dfc-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "jery-art-a1dfc",
   storageBucket: "jery-art-a1dfc.firebasestorage.app",
   messagingSenderId: "85625110836",
