@@ -4,7 +4,7 @@ import { getDatabase, ref, set, get, child } from "firebase/database";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // =============================================================================
-// 1. CONFIGURATION FIREBASE (Base de données)
+// 1. CONFIGURATION (FIREBASE + IA)
 // =============================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyBawOErCFdDYLa3tP1oWqGO3OazsXLUD5U",
@@ -17,15 +17,14 @@ const firebaseConfig = {
   measurementId: "G-J3ZHPF1P5Z"
 };
 
+const GEMINI_API_KEY = "AIzaSyBP2AVjRM-RE5-J99u-XVODU_-gHI_xpO0"; 
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. CONFIGURATION IA (Traduction)
+// 2. FONCTION DE TRADUCTION INTELLIGENTE
 // =============================================================================
-// J'ai mis la clé de ta capture d'écran ici 👇
-const GEMINI_API_KEY = "AIzaSyBP2AVjRM-RE5-J99u-XVODU_-gHI_xpO0"; 
-
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
@@ -33,11 +32,9 @@ const generateTranslations = async (text: string) => {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `Tu es un expert en traduction. Traduis le texte suivant : "${text}".
-    Langue source : Français.
-    Langues cibles : Malagasy (mg), Anglais (en), Russe (ru).
-    Réponds UNIQUEMENT avec ce format JSON strict :
-    { "mg": "...", "en": "...", "ru": "..." }`;
+    const prompt = `Traduis ce texte : "${text}".
+    Source: Français. Cibles: Malgache (mg), Anglais (en), Russe (ru).
+    Format JSON strict: { "mg": "...", "en": "...", "ru": "..." }`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -52,13 +49,13 @@ const generateTranslations = async (text: string) => {
     };
   } catch (error) {
     console.error("Erreur IA:", error);
-    alert("Erreur de traduction. Vérifie ta connexion.");
+    // On ne bloque pas l'utilisateur, on renvoie le texte original si erreur
     return { fr: text, mg: text, en: text, ru: text };
   }
 };
 
 // =============================================================================
-// TYPES
+// 3. TYPES & DONNÉES
 // =============================================================================
 type Language = 'fr' | 'mg' | 'en' | 'ru';
 type LocalizedText = { [key in Language]?: string };
@@ -91,9 +88,6 @@ interface SiteContent {
   contactInfo: { whatsapp: string; facebook: string; email: string };
 }
 
-// =============================================================================
-// DONNÉES INITIALES
-// =============================================================================
 const EUR_TO_MGA = 4800;
 
 const INITIAL_CONTENT: SiteContent = {
@@ -102,7 +96,7 @@ const INITIAL_CONTENT: SiteContent = {
   heroImageUrl: "https://images.unsplash.com/photo-1544531586-fde5298cdd40?q=80&w=1920",
   aboutText: { fr: "Bienvenue...", mg: "Tongasoa...", en: "Welcome...", ru: "Добро пожаловать..." },
   commission: { title: { fr: "Commandes" }, desc: { fr: "Contactez-moi" } },
-  contactInfo: { whatsapp: "261340000000", facebook: "", email: "" }
+  contactInfo: { whatsapp: "261340000000", facebook: "https://facebook.com", email: "contact@jery.mg" }
 };
 
 const UI_TRANSLATIONS: Record<string, any> = {
@@ -112,41 +106,23 @@ const UI_TRANSLATIONS: Record<string, any> = {
   ru: { nav: { home: "Главная", gallery: "Галерея", blog: "Журнал" }, gallery: { title: "Коллекция", unavailable: "Продано", order: "Заказать" }, blog: { title: "Журнал студии" } }
 };
 
-// =============================================================================
-// SERVICE DE BASE DE DONNÉES
-// =============================================================================
 const DataService = {
   getAllData: async () => {
-    const dbRef = ref(db);
     try {
-      const snapshot = await get(child(dbRef, '/'));
-      if (snapshot.exists()) {
-        return snapshot.val();
-      } else {
-        return null;
-      }
-    } catch (error) {
-      console.error("Erreur lecture:", error);
-      return null;
-    }
+      const snapshot = await get(child(ref(db), '/'));
+      return snapshot.exists() ? snapshot.val() : null;
+    } catch (e) { return null; }
   },
-  
   save: async (path: string, data: any) => {
-    try {
-      await set(ref(db, path), data);
-      return true;
-    } catch (e) {
-      alert("Erreur de sauvegarde : " + e);
-      return false;
-    }
+    try { await set(ref(db, path), data); return true; } 
+    catch (e) { alert("Erreur sauvegarde: " + e); return false; }
   },
-
   getAdminPassword: () => localStorage.getItem('jery_admin_pass') || 'admin123',
   saveAdminPassword: (pass: string) => localStorage.setItem('jery_admin_pass', pass),
 };
 
 // =============================================================================
-// COMPOSANT INPUT OPTIMISÉ
+// 4. COMPOSANT INPUT OPTIMISÉ
 // =============================================================================
 const LocalizedInput = ({ label, value, onChange, setIsLoading, isTextArea = false }: any) => {
   const handleTranslate = async () => {
@@ -168,7 +144,7 @@ const LocalizedInput = ({ label, value, onChange, setIsLoading, isTextArea = fal
           <div key={l}>
             <span className="text-[9px] uppercase font-mono text-stone-400">{l}</span>
             {isTextArea ? (
-              <textarea className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700 outline-none focus:border-gold-600" value={value[l] || ''} onChange={e => onChange({...value, [l]: e.target.value})} rows={3} />
+              <textarea className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700 outline-none focus:border-gold-600" value={value[l] || ''} onChange={e => onChange({...value, [l]: e.target.value})} rows={4} />
             ) : (
               <input type="text" className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700 outline-none focus:border-gold-600" value={value[l] || ''} onChange={e => onChange({...value, [l]: e.target.value})} />
             )}
@@ -180,10 +156,9 @@ const LocalizedInput = ({ label, value, onChange, setIsLoading, isTextArea = fal
 };
 
 // =============================================================================
-// APPLICATION PRINCIPALE
+// 5. APPLICATION PRINCIPALE
 // =============================================================================
 const App = () => {
-  // --- States ---
   const [lang, setLang] = useState<any>('fr'); 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isAdmin, setIsAdmin] = useState(false);
@@ -193,9 +168,10 @@ const App = () => {
   
   const [passwordInput, setPasswordInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [selectedImg, setSelectedImg] = useState<string | null>(null);
   
-  // DONNÉES
+  // MODIFICATION : Au lieu de stocker juste une image, on stocke toute la sculpture pour le zoom
+  const [selectedSculpture, setSelectedSculpture] = useState<Sculpture | null>(null);
+  
   const [sculptures, setSculptures] = useState<Sculpture[]>([]);
   const [content, setContent] = useState<SiteContent>(INITIAL_CONTENT);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
@@ -206,7 +182,6 @@ const App = () => {
 
   const t = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS['fr'];
 
-  // --- Chargement ---
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -223,12 +198,8 @@ const App = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput.trim() === DataService.getAdminPassword()) {
-      setIsAdmin(true);
-      setPasswordInput('');
-    } else {
-      alert("Mot de passe incorrect.");
-    }
+    if (passwordInput.trim() === DataService.getAdminPassword()) { setIsAdmin(true); setPasswordInput(''); } 
+    else { alert("Mot de passe incorrect."); }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
@@ -256,9 +227,8 @@ const App = () => {
     return `${mga} Ar (${priceInEuro} €)`;
   };
 
-  // --- Rendu ---
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${theme === 'dark' ? 'dark bg-stone-900 text-stone-100' : 'bg-stone-50 text-stone-900'}`}>
+    <div className={`min-h-screen flex flex-col transition-colors duration-300 ${theme === 'dark' ? 'dark bg-stone-900 text-stone-100' : 'bg-stone-50 text-stone-900'}`}>
       <nav className="sticky top-0 z-50 bg-stone-50/90 dark:bg-stone-900/90 backdrop-blur-md border-b dark:border-stone-800 px-6 py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-serif tracking-[0.4em] font-bold cursor-pointer" onClick={() => setView('home')}>JERY</h1>
@@ -281,7 +251,8 @@ const App = () => {
         </div>
       </nav>
 
-      <main>
+      {/* flex-1 permet de pousser le footer en bas si le contenu est court */}
+      <main className="flex-1">
         {view === 'home' && (
           <>
             <header className="relative h-[85vh] flex items-center justify-center overflow-hidden">
@@ -316,7 +287,8 @@ const App = () => {
               {sculptures.map(s => (
                 <div key={s.id} className="group">
                   <div className="relative overflow-hidden aspect-square mb-6 bg-stone-200 dark:bg-stone-800 rounded-lg">
-                    <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer" onClick={() => setSelectedImg(s.imageUrl)} />
+                    {/* On clique sur l'image pour ouvrir le détail */}
+                    <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer" onClick={() => setSelectedSculpture(s)} />
                     {!s.available && <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] px-3 py-1 font-bold">{t.gallery.unavailable}</div>}
                   </div>
                   <h4 className="text-xl font-serif mb-2">{s.title[lang]}</h4>
@@ -462,8 +434,15 @@ const App = () => {
                       <div className="bg-white dark:bg-stone-800 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-2xl shadow-2xl">
                         <h3 className="text-xl font-serif uppercase tracking-widest mb-6">Éditer Sculpture</h3>
                         <LocalizedInput setIsLoading={setIsLoading} label="Titre" value={editingSculpture.title} onChange={v => setEditingSculpture({...editingSculpture, title: v})} />
+                        {/* ICI : LE CHAMP DESCRIPTION AGRANDI ET FONCTIONNEL */}
+                        <LocalizedInput setIsLoading={setIsLoading} label="Description (Apparaît dans le zoom)" value={editingSculpture.description} onChange={v => setEditingSculpture({...editingSculpture, description: v})} isTextArea />
+                        
                         <input type="file" onChange={e => handleFileUpload(e, (url) => setEditingSculpture({...editingSculpture, imageUrl: url}))} className="mb-4 text-xs" />
                         {editingSculpture.imageUrl && <img src={editingSculpture.imageUrl} className="w-20 h-20 object-cover mb-4 rounded" />}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <input type="number" placeholder="Prix €" className="p-3 border rounded" value={editingSculpture.price} onChange={e => setEditingSculpture({...editingSculpture, price: Number(e.target.value)})} />
+                           <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={editingSculpture.available} onChange={e => setEditingSculpture({...editingSculpture, available: e.target.checked})} /> Disponible à la vente</label>
+                        </div>
                         <div className="flex justify-end gap-4 mt-8">
                           <button onClick={() => setEditingSculpture(null)} className="px-6 py-2 text-xs font-bold uppercase">Annuler</button>
                           <button onClick={async () => {
@@ -529,11 +508,35 @@ const App = () => {
         )}
       </main>
 
-      {selectedImg && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="relative">
-            <img src={selectedImg} className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" />
-            <button onClick={() => setSelectedImg(null)} className="absolute top-4 right-4 text-white text-4xl">&times;</button>
+      <footer className="py-20 bg-stone-900 text-stone-100 px-6 border-t border-stone-800">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
+          <div><h5 className="text-2xl font-serif tracking-[0.4em] mb-6">JERY</h5><p className="text-stone-500 text-xs font-light">{content.heroSubtitle[lang]}</p></div>
+          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Menu</h6><ul className="text-xs space-y-3 font-light"><li className="cursor-pointer" onClick={() => setView('home')}>Accueil</li><li className="cursor-pointer" onClick={() => setView('gallery')}>Galerie</li><li className="cursor-pointer" onClick={() => setView('blog')}>Journal</li></ul></div>
+          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Contact</h6>
+            <div className="flex flex-col gap-2 text-sm text-stone-400">
+              {content.contactInfo.facebook && <a href={content.contactInfo.facebook} target="_blank" className="hover:text-white">Facebook</a>}
+              {content.contactInfo.whatsapp && <a href={`https://wa.me/${content.contactInfo.whatsapp}`} target="_blank" className="hover:text-white">WhatsApp</a>}
+              {content.contactInfo.email && <a href={`mailto:${content.contactInfo.email}`} className="hover:text-white">{content.contactInfo.email}</a>}
+            </div>
+          </div>
+        </div>
+        <p className="mt-20 text-center text-stone-600 text-[10px] uppercase tracking-[0.5em]">© {new Date().getFullYear()} JERY SCULPTURES MADAGASCAR</p>
+      </footer>
+
+      {/* MODALE DE ZOOM AMÉLIORÉE (AFFICHE MAINTENANT LA DESCRIPTION) */}
+      {selectedSculpture && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+          <div className="relative max-w-5xl w-full flex flex-col md:flex-row bg-white dark:bg-stone-800 rounded-lg overflow-hidden shadow-2xl">
+            <div className="md:w-2/3 bg-black flex items-center justify-center">
+               <img src={selectedSculpture.imageUrl} className="max-h-[80vh] w-full object-contain" />
+            </div>
+            <div className="md:w-1/3 p-8 flex flex-col justify-center">
+               <h3 className="text-3xl font-serif mb-4 text-stone-900 dark:text-white">{selectedSculpture.title[lang]}</h3>
+               <p className="text-stone-600 dark:text-stone-300 mb-6 italic leading-relaxed">{selectedSculpture.description[lang]}</p>
+               <p className="text-2xl font-bold text-gold-600 mb-8">{formatPriceDisplay(selectedSculpture.price)}</p>
+               <button onClick={() => window.open(`https://wa.me/${content.contactInfo.whatsapp}?text=Intéressé par ${selectedSculpture.title[lang]}`, '_blank')} className="bg-stone-900 dark:bg-white text-white dark:text-stone-900 py-4 px-8 uppercase font-bold tracking-widest text-xs hover:opacity-90">Commander</button>
+            </div>
+            <button onClick={() => setSelectedSculpture(null)} className="absolute top-4 right-4 text-stone-500 hover:text-red-500 text-4xl leading-none">&times;</button>
           </div>
         </div>
       )}
