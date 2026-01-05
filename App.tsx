@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, child } from "firebase/database";
 
 // =============================================================================
-// ⚠️ CONFIGURATION FIREBASE (CORRIGÉE EUROPE)
+// ⚠️ CONFIGURATION FIREBASE (EUROPE)
 // =============================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyBawOErCFdDYLa3tP1oWqGO3OazsXLUD5U",
@@ -364,10 +364,19 @@ const App = () => {
 
                   <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
                     <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">CONTACTS</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.whatsapp} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, whatsapp: e.target.value}})} placeholder="WhatsApp" />
-                      <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.facebook} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, facebook: e.target.value}})} placeholder="Lien Facebook" />
-                      <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.email} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, email: e.target.value}})} placeholder="Email Professionnel" />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase mb-2 block text-stone-500">WhatsApp</label>
+                        <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.whatsapp} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, whatsapp: e.target.value}})} placeholder="261..." />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase mb-2 block text-stone-500">Facebook</label>
+                        <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.facebook} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, facebook: e.target.value}})} placeholder="Lien complet" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase mb-2 block text-stone-500">Email</label>
+                        <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.email} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, email: e.target.value}})} placeholder="Email Pro" />
+                      </div>
                     </div>
                   </div>
 
