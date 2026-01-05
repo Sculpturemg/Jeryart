@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, child } from "firebase/database";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // =============================================================================
 // 1. CONFIGURATION
@@ -17,41 +16,51 @@ const firebaseConfig = {
   measurementId: "G-J3ZHPF1P5Z"
 };
 
-const GEMINI_API_KEY = "AIzaSyBP2AVjRM-RE5-J99u-XVODU_-gHl_xpO0"; 
+const GEMINI_API_KEY = "AIzaSyDFY03-j2_tq1VM-MOV9ruroohEJrddSJc"; 
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (RETOUR AU MODELE FLASH - LE BON)
+// 2. FONCTION DE TRADUCTION (MÉTHODE HTTP DIRECTE - PLUS FIABLE)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
   try {
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    // ON REVIENT SUR FLASH MAINTENANT QUE LA CLÉ EST BONNE
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const prompt = `Tu es un expert en traduction. Traduis le texte suivant : "${text}".
-    Langue source : Français.
-    Langues cibles : Malgache (mg), Anglais (en), Russe (ru).
+    // On utilise l'appel direct pour contourner les problèmes de version de librairie
+    // On utilise le modèle "gemini-pro" qui est le plus stable via cette méthode
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
     
-    RÈGLE ABSOLUE : Tu dois répondre UNIQUEMENT avec un objet JSON valide. Pas de phrase avant, pas de phrase après.
-    Format attendu :
-    { "mg": "traduction malgache", "en": "traduction anglais", "ru": "traduction russe" }`;
+    const prompt = `Tu es un traducteur expert. Traduis : "${text}".
+    Source: Français.
+    Cibles: Malgache (mg), Anglais (en), Russe (ru).
+    IMPORTANT: Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const textResponse = response.text();
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
 
+    if (!response.ok) {
+      throw new Error(`Erreur Google: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!textResponse) throw new Error("Réponse vide de l'IA");
+
+    // Nettoyage du JSON
     const firstBrace = textResponse.indexOf('{');
     const lastBrace = textResponse.lastIndexOf('}');
-
+    
     if (firstBrace !== -1 && lastBrace !== -1) {
       const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
       const translations = JSON.parse(jsonString);
-
       return {
         fr: text,
         mg: translations.mg || text,
@@ -59,12 +68,12 @@ const generateTranslations = async (text: string) => {
         ru: translations.ru || text
       };
     } else {
-      throw new Error("Format de réponse IA invalide");
+      throw new Error("Format JSON invalide");
     }
 
   } catch (error: any) {
     console.error("Erreur Traduction:", error);
-    alert("Erreur de traduction : " + error.message);
+    alert("Erreur Traduction : " + error.message);
     return { fr: text, mg: text, en: text, ru: text };
   }
 };
@@ -241,6 +250,7 @@ const App = () => {
   };
 
   return (
+    // AJOUT: flex flex-col et min-h-screen sur le conteneur principal
     <div className={`min-h-screen flex flex-col transition-colors duration-300 ${theme === 'dark' ? 'dark bg-stone-900 text-stone-100' : 'bg-stone-50 text-stone-900'}`}>
       <nav className="sticky top-0 z-50 bg-stone-50/90 dark:bg-stone-900/90 backdrop-blur-md border-b dark:border-stone-800 px-6 py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -264,8 +274,8 @@ const App = () => {
         </div>
       </nav>
 
-      {/* ZONE PRINCIPALE : flex-1 assure que le footer est poussé en bas */}
-      <main className="flex-1">
+      {/* AJOUT: flex-grow sur le main pour qu'il prenne toute la place disponible */}
+      <main className="flex-grow w-full">
         {view === 'home' && (
           <>
             <header className="relative h-[85vh] flex items-center justify-center overflow-hidden">
@@ -300,6 +310,7 @@ const App = () => {
               {sculptures.map(s => (
                 <div key={s.id} className="group">
                   <div className="relative overflow-hidden aspect-square mb-6 bg-stone-200 dark:bg-stone-800 rounded-lg">
+                    {/* On clique sur l'image pour ouvrir le détail */}
                     <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer" onClick={() => setSelectedSculpture(s)} />
                     {!s.available && <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] px-3 py-1 font-bold">{t.gallery.unavailable}</div>}
                   </div>
@@ -519,6 +530,22 @@ const App = () => {
           )
         )}
       </main>
+
+      {/* FOOTER : "mt-auto" le force à rester en bas */}
+      <footer className="w-full py-20 bg-black text-stone-100 px-6 border-t border-stone-800 mt-auto">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
+          <div><h5 className="text-2xl font-serif tracking-[0.4em] mb-6">JERY</h5><p className="text-stone-500 text-xs font-light">{content.heroSubtitle[lang]}</p></div>
+          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Menu</h6><ul className="text-xs space-y-3 font-light"><li className="cursor-pointer" onClick={() => setView('home')}>Accueil</li><li className="cursor-pointer" onClick={() => setView('gallery')}>Galerie</li><li className="cursor-pointer" onClick={() => setView('blog')}>Journal</li></ul></div>
+          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Contact</h6>
+            <div className="flex flex-col gap-2 text-sm text-stone-400">
+              {content.contactInfo.facebook && <a href={content.contactInfo.facebook} target="_blank" className="hover:text-white">Facebook</a>}
+              {content.contactInfo.whatsapp && <a href={`https://wa.me/${content.contactInfo.whatsapp}`} target="_blank" className="hover:text-white">WhatsApp</a>}
+              {content.contactInfo.email && <a href={`mailto:${content.contactInfo.email}`} className="hover:text-white">{content.contactInfo.email}</a>}
+            </div>
+          </div>
+        </div>
+        <p className="mt-20 text-center text-stone-600 text-[10px] uppercase tracking-[0.5em]">© {new Date().getFullYear()} JERY SCULPTURES MADAGASCAR</p>
+      </footer>
 
       {/* MODALE DE ZOOM */}
       {selectedSculpture && (
