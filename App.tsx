@@ -4,7 +4,7 @@ import { getDatabase, ref, set, get, child } from "firebase/database";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // =============================================================================
-// 1. CONFIGURATION (FIREBASE + IA)
+// 1. CONFIGURATION
 // =============================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyBawOErCFdDYLa3tP1oWqGO3OazsXLUD5U",
@@ -17,22 +17,21 @@ const firebaseConfig = {
   measurementId: "G-J3ZHPF1P5Z"
 };
 
-// TA NOUVELLE CLÉ EST ICI 👇
-const GEMINI_API_KEY = "AIzaSyDFY03-j2_tq1VM-MOV9ruroohEJrddSJc"; 
+const GEMINI_API_KEY = "AIzaSyBP2AVjRM-RE5-J99u-XVODU_-gHl_xpO0"; 
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (AVEC LE MODELE RAPIDE FLASH)
+// 2. FONCTION DE TRADUCTION (MODELE GEMINI-PRO)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
   try {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    // On utilise le modèle Flash qui est très rapide et gratuit
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // CHANGEMENT ICI : Utilisation de "gemini-pro" comme demandé
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const prompt = `Tu es un expert en traduction. Traduis le texte suivant : "${text}".
     Langue source : Français.
@@ -46,7 +45,6 @@ const generateTranslations = async (text: string) => {
     const response = await result.response;
     const textResponse = response.text();
 
-    // Nettoyage agressif pour trouver le JSON
     const firstBrace = textResponse.indexOf('{');
     const lastBrace = textResponse.lastIndexOf('}');
 
@@ -61,7 +59,7 @@ const generateTranslations = async (text: string) => {
         ru: translations.ru || text
       };
     } else {
-      throw new Error("Format de réponse IA invalide (pas de JSON trouvé)");
+      throw new Error("Format de réponse IA invalide");
     }
 
   } catch (error: any) {
@@ -139,7 +137,7 @@ const DataService = {
 };
 
 // =============================================================================
-// 4. COMPOSANT INPUT OPTIMISÉ
+// 4. COMPOSANT INPUT
 // =============================================================================
 const LocalizedInput = ({ label, value, onChange, setIsLoading, isTextArea = false }: any) => {
   const handleTranslate = async () => {
@@ -185,8 +183,6 @@ const App = () => {
   
   const [passwordInput, setPasswordInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  
-  // MODIFICATION : Au lieu de stocker juste une image, on stocke toute la sculpture pour le zoom
   const [selectedSculpture, setSelectedSculpture] = useState<Sculpture | null>(null);
   
   const [sculptures, setSculptures] = useState<Sculpture[]>([]);
@@ -268,8 +264,8 @@ const App = () => {
         </div>
       </nav>
 
-      {/* flex-1 permet de pousser le footer en bas si le contenu est court */}
-      <main className="flex-1">
+      {/* ZONE PRINCIPALE : flex-grow permet de pousser le footer en bas */}
+      <main className="flex-grow">
         {view === 'home' && (
           <>
             <header className="relative h-[85vh] flex items-center justify-center overflow-hidden">
@@ -304,7 +300,6 @@ const App = () => {
               {sculptures.map(s => (
                 <div key={s.id} className="group">
                   <div className="relative overflow-hidden aspect-square mb-6 bg-stone-200 dark:bg-stone-800 rounded-lg">
-                    {/* On clique sur l'image pour ouvrir le détail */}
                     <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer" onClick={() => setSelectedSculpture(s)} />
                     {!s.available && <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] px-3 py-1 font-bold">{t.gallery.unavailable}</div>}
                   </div>
@@ -525,7 +520,23 @@ const App = () => {
         )}
       </main>
 
-      {/* MODALE DE ZOOM AMÉLIORÉE (AFFICHE MAINTENANT LA DESCRIPTION) */}
+      {/* FOOTER : "w-full" force la pleine largeur, "bg-black" force le noir */}
+      <footer className="w-full py-20 bg-black text-stone-100 px-6 border-t border-stone-800 mt-auto">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
+          <div><h5 className="text-2xl font-serif tracking-[0.4em] mb-6">JERY</h5><p className="text-stone-500 text-xs font-light">{content.heroSubtitle[lang]}</p></div>
+          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Menu</h6><ul className="text-xs space-y-3 font-light"><li className="cursor-pointer" onClick={() => setView('home')}>Accueil</li><li className="cursor-pointer" onClick={() => setView('gallery')}>Galerie</li><li className="cursor-pointer" onClick={() => setView('blog')}>Journal</li></ul></div>
+          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Contact</h6>
+            <div className="flex flex-col gap-2 text-sm text-stone-400">
+              {content.contactInfo.facebook && <a href={content.contactInfo.facebook} target="_blank" className="hover:text-white">Facebook</a>}
+              {content.contactInfo.whatsapp && <a href={`https://wa.me/${content.contactInfo.whatsapp}`} target="_blank" className="hover:text-white">WhatsApp</a>}
+              {content.contactInfo.email && <a href={`mailto:${content.contactInfo.email}`} className="hover:text-white">{content.contactInfo.email}</a>}
+            </div>
+          </div>
+        </div>
+        <p className="mt-20 text-center text-stone-600 text-[10px] uppercase tracking-[0.5em]">© {new Date().getFullYear()} JERY SCULPTURES MADAGASCAR</p>
+      </footer>
+
+      {/* MODALE DE ZOOM */}
       {selectedSculpture && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
           <div className="relative max-w-5xl w-full flex flex-col md:flex-row bg-white dark:bg-stone-800 rounded-lg overflow-hidden shadow-2xl">
