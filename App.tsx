@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, child } from "firebase/database";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // =============================================================================
-// ⚠️ CONFIGURATION FIREBASE (EUROPE)
+// 1. CONFIGURATION FIREBASE (Base de données)
 // =============================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyBawOErCFdDYLa3tP1oWqGO3OazsXLUD5U",
@@ -16,12 +17,48 @@ const firebaseConfig = {
   measurementId: "G-J3ZHPF1P5Z"
 };
 
-// Initialisation du Cerveau (Firebase)
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// TYPES & INTERFACES
+// 2. CONFIGURATION IA (Traduction)
+// =============================================================================
+// J'ai mis la clé de ta capture d'écran ici 👇
+const GEMINI_API_KEY = "AIzaSyBP2AVjRM-RE5-J99u-XVODU_-gHI_xpO0"; 
+
+const generateTranslations = async (text: string) => {
+  if (!text) return { fr: "", mg: "", en: "", ru: "" };
+  
+  try {
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `Tu es un expert en traduction. Traduis le texte suivant : "${text}".
+    Langue source : Français.
+    Langues cibles : Malagasy (mg), Anglais (en), Russe (ru).
+    Réponds UNIQUEMENT avec ce format JSON strict :
+    { "mg": "...", "en": "...", "ru": "..." }`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const jsonString = response.text().replace(/```json|```/g, '').trim();
+    const translations = JSON.parse(jsonString);
+
+    return {
+      fr: text,
+      mg: translations.mg || text,
+      en: translations.en || text,
+      ru: translations.ru || text
+    };
+  } catch (error) {
+    console.error("Erreur IA:", error);
+    alert("Erreur de traduction. Vérifie ta connexion.");
+    return { fr: text, mg: text, en: text, ru: text };
+  }
+};
+
+// =============================================================================
+// TYPES
 // =============================================================================
 type Language = 'fr' | 'mg' | 'en' | 'ru';
 type LocalizedText = { [key in Language]?: string };
@@ -108,8 +145,6 @@ const DataService = {
   saveAdminPassword: (pass: string) => localStorage.setItem('jery_admin_pass', pass),
 };
 
-const generateTranslations = async (text: string) => ({ fr: text, mg: text, en: text, ru: text });
-
 // =============================================================================
 // COMPOSANT INPUT OPTIMISÉ
 // =============================================================================
@@ -117,17 +152,16 @@ const LocalizedInput = ({ label, value, onChange, setIsLoading, isTextArea = fal
   const handleTranslate = async () => {
     if (!value.fr) return;
     setIsLoading(true);
-    try {
-      const translated = await generateTranslations(value.fr);
-      onChange(translated);
-    } catch (e) { alert("Erreur IA"); } finally { setIsLoading(false); }
+    const translated = await generateTranslations(value.fr);
+    onChange(translated);
+    setIsLoading(false);
   };
 
   return (
     <div className="mb-6 p-4 border border-stone-200 dark:border-stone-800 rounded-lg bg-stone-50 dark:bg-stone-900/50">
       <div className="flex justify-between items-center mb-4">
         <label className="text-[10px] uppercase tracking-widest font-bold text-gold-600">{label}</label>
-        <button type="button" onClick={handleTranslate} className="text-[10px] bg-gold-600 text-white px-3 py-1 rounded hover:bg-gold-700">TRADUIRE ✨</button>
+        <button type="button" onClick={handleTranslate} className="text-[10px] bg-gold-600 text-white px-3 py-1 rounded hover:bg-gold-700 transition-colors">TRADUIRE ✨</button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {(['fr', 'mg', 'en', 'ru'] as const).map(l => (
