@@ -3,12 +3,11 @@ import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, child } from "firebase/database";
 
 // =============================================================================
-// ⚠️ CONFIGURATION FIREBASE (CORRIGÉE AVEC TON LIEN EUROPE)
+// ⚠️ CONFIGURATION FIREBASE (CORRIGÉE EUROPE)
 // =============================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyBawOErCFdDYLa3tP1oWqGO3OazsXLUD5U",
   authDomain: "jery-art-a1dfc.firebaseapp.com",
-  // 👇 LE LIEN EXACT DE TON IMAGE (EUROPE)
   databaseURL: "https://jery-art-a1dfc-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "jery-art-a1dfc",
   storageBucket: "jery-art-a1dfc.firebasestorage.app",
@@ -56,7 +55,7 @@ interface SiteContent {
 }
 
 // =============================================================================
-// DONNÉES INITIALES (Au cas où la base est vide)
+// DONNÉES INITIALES
 // =============================================================================
 const EUR_TO_MGA = 4800;
 
@@ -77,10 +76,9 @@ const UI_TRANSLATIONS: Record<string, any> = {
 };
 
 // =============================================================================
-// SERVICE DE BASE DE DONNÉES (Connexion Réelle)
+// SERVICE DE BASE DE DONNÉES
 // =============================================================================
 const DataService = {
-  // Lire les données depuis Internet (Firebase)
   getAllData: async () => {
     const dbRef = ref(db);
     try {
@@ -96,7 +94,6 @@ const DataService = {
     }
   },
   
-  // Sauvegarder sur Internet
   save: async (path: string, data: any) => {
     try {
       await set(ref(db, path), data);
@@ -114,7 +111,7 @@ const DataService = {
 const generateTranslations = async (text: string) => ({ fr: text, mg: text, en: text, ru: text });
 
 // =============================================================================
-// COMPOSANT INPUT OPTIMISÉ (Pour écrire vite sans bugs)
+// COMPOSANT INPUT OPTIMISÉ
 // =============================================================================
 const LocalizedInput = ({ label, value, onChange, setIsLoading, isTextArea = false }: any) => {
   const handleTranslate = async () => {
@@ -164,7 +161,7 @@ const App = () => {
   const [newPassword, setNewPassword] = useState('');
   const [selectedImg, setSelectedImg] = useState<string | null>(null);
   
-  // DONNÉES (Connectées à Firebase)
+  // DONNÉES
   const [sculptures, setSculptures] = useState<Sculpture[]>([]);
   const [content, setContent] = useState<SiteContent>(INITIAL_CONTENT);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
@@ -175,7 +172,7 @@ const App = () => {
 
   const t = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS['fr'];
 
-  // --- Chargement initial depuis Firebase ---
+  // --- Chargement ---
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -367,7 +364,11 @@ const App = () => {
 
                   <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
                     <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">CONTACTS</h3>
-                    <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded mb-4" value={content.contactInfo.whatsapp} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, whatsapp: e.target.value}})} placeholder="Numéro WhatsApp" />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.whatsapp} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, whatsapp: e.target.value}})} placeholder="WhatsApp" />
+                      <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.facebook} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, facebook: e.target.value}})} placeholder="Lien Facebook" />
+                      <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.email} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, email: e.target.value}})} placeholder="Email Professionnel" />
+                    </div>
                   </div>
 
                   <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
