@@ -22,14 +22,14 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (MÉTHODE HTTP DIRECTE - 100% FIABLE)
+// 2. FONCTION DE TRADUCTION (URL MISE À JOUR : FLASH 1.5)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
   try {
-    // Utilisation de l'API REST directe avec le modèle 'gemini-pro' (le plus stable)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    // CORRECTION ICI : On pointe vers gemini-1.5-flash qui est le modèle actif
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     
     const prompt = `Traduis ce texte : "${text}".
     Source : Français.
@@ -46,7 +46,7 @@ const generateTranslations = async (text: string) => {
 
     if (!response.ok) {
       const errData = await response.json();
-      throw new Error(errData.error?.message || "Erreur inconnue");
+      throw new Error(errData.error?.message || `Erreur HTTP ${response.status}`);
     }
 
     const data = await response.json();
@@ -273,7 +273,7 @@ const App = () => {
         </div>
       </nav>
 
-      {/* ZONE PRINCIPALE AVEC FLEX-GROW POUR POUSSER LE FOOTER */}
+      {/* ZONE PRINCIPALE AVEC FLEX-GROW POUR LE FOOTER */}
       <main className="flex-grow w-full">
         {view === 'home' && (
           <>
@@ -530,8 +530,8 @@ const App = () => {
         )}
       </main>
 
-      {/* FOOTER - w-full pour pleine largeur + mt-auto pour rester en bas */}
-      <footer className="w-full py-20 bg-stone-900 text-stone-100 px-6 border-t border-stone-800 mt-auto">
+      {/* FOOTER AVEC Z-INDEX ÉLEVÉ ET POSITIONNEMENT FORCÉ */}
+      <footer className="w-full py-20 bg-black text-stone-100 px-6 border-t border-stone-800 mt-auto z-10 relative">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
           <div><h5 className="text-2xl font-serif tracking-[0.4em] mb-6">JERY</h5><p className="text-stone-500 text-xs font-light">{content.heroSubtitle[lang]}</p></div>
           <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Menu</h6><ul className="text-xs space-y-3 font-light"><li className="cursor-pointer" onClick={() => setView('home')}>Accueil</li><li className="cursor-pointer" onClick={() => setView('gallery')}>Galerie</li><li className="cursor-pointer" onClick={() => setView('blog')}>Journal</li></ul></div>
