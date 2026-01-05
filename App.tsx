@@ -23,7 +23,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION INTELLIGENTE
+// 2. FONCTION DE TRADUCTION (VERSION DEBUG ET ROBUSTE)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
@@ -32,24 +32,44 @@ const generateTranslations = async (text: string) => {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `Traduis ce texte : "${text}".
-    Source: Français. Cibles: Malgache (mg), Anglais (en), Russe (ru).
-    Format JSON strict: { "mg": "...", "en": "...", "ru": "..." }`;
+    const prompt = `Tu es un expert en traduction. Traduis le texte suivant : "${text}".
+    Langue source : Français.
+    Langues cibles : Malgache (mg), Anglais (en), Russe (ru).
+    
+    RÈGLE ABSOLUE : Tu dois répondre UNIQUEMENT avec un objet JSON valide. Pas de phrase avant, pas de phrase après.
+    Format attendu :
+    { "mg": "traduction malgache", "en": "traduction anglais", "ru": "traduction russe" }`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const jsonString = response.text().replace(/```json|```/g, '').trim();
-    const translations = JSON.parse(jsonString);
+    const textResponse = response.text();
 
-    return {
-      fr: text,
-      mg: translations.mg || text,
-      en: translations.en || text,
-      ru: translations.ru || text
-    };
-  } catch (error) {
-    console.error("Erreur IA:", error);
-    // On ne bloque pas l'utilisateur, on renvoie le texte original si erreur
+    console.log("Réponse IA brute :", textResponse); // Pour voir dans la console
+
+    // Nettoyage agressif pour trouver le JSON même s'il y a du texte autour
+    const firstBrace = textResponse.indexOf('{');
+    const lastBrace = textResponse.lastIndexOf('}');
+
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
+      const translations = JSON.parse(jsonString);
+
+      return {
+        fr: text,
+        mg: translations.mg || text + " (Erreur MG)",
+        en: translations.en || text + " (Erreur EN)",
+        ru: translations.ru || text + " (Erreur RU)"
+      };
+    } else {
+      throw new Error("Format de réponse IA invalide (pas de JSON trouvé)");
+    }
+
+  } catch (error: any) {
+    console.error("Erreur Traduction:", error);
+    // Affiche l'erreur exacte à l'écran pour comprendre
+    alert("Erreur de traduction : " + error.message);
+    
+    // Fallback : on renvoie le texte d'origine pour ne pas planter
     return { fr: text, mg: text, en: text, ru: text };
   }
 };
@@ -168,8 +188,6 @@ const App = () => {
   
   const [passwordInput, setPasswordInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  
-  // MODIFICATION : Au lieu de stocker juste une image, on stocke toute la sculpture pour le zoom
   const [selectedSculpture, setSelectedSculpture] = useState<Sculpture | null>(null);
   
   const [sculptures, setSculptures] = useState<Sculpture[]>([]);
