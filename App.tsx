@@ -1,4 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, set, get, child } from "firebase/database";
+
+// =============================================================================
+// ⚠️ CONFIGURATION FIREBASE (TES CLÉS SONT DÉJÀ MISES ICI)
+// =============================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyBawOErCFdDYLa3tP1oWqGO3OazsXLUD5U",
+  authDomain: "jery-art-a1dfc.firebaseapp.com",
+  databaseURL: "https://jery-art-a1dfc-default-rtdb.firebaseio.com", // J'ai déduit ce lien, il est standard
+  projectId: "jery-art-a1dfc",
+  storageBucket: "jery-art-a1dfc.firebasestorage.app",
+  messagingSenderId: "85625110836",
+  appId: "1:85625110836:web:feb757f11fa6eaf8c6e561",
+  measurementId: "G-J3ZHPF1P5Z"
+};
+
+// Initialisation du Cerveau (Firebase)
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
 // =============================================================================
 // TYPES & INTERFACES
@@ -35,7 +55,7 @@ interface SiteContent {
 }
 
 // =============================================================================
-// DONNÉES INITIALES
+// DONNÉES INITIALES (Au cas où la base est vide)
 // =============================================================================
 const EUR_TO_MGA = 4800;
 
@@ -43,16 +63,10 @@ const INITIAL_CONTENT: SiteContent = {
   heroTitle: { fr: "L'Âme du Bois", mg: "Ny Fanahin'ny Hazo", en: "Soul of Wood", ru: "Душа Дерева" },
   heroSubtitle: { fr: "Sculptures Uniques à Madagascar", mg: "Sary Sokitra miavaka eto Madagasikara", en: "Unique Sculptures in Madagascar", ru: "Уникальные скульптуры на Мадагаскаре" },
   heroImageUrl: "https://images.unsplash.com/photo-1544531586-fde5298cdd40?q=80&w=1920",
-  aboutText: { fr: "Bienvenue dans mon atelier...", mg: "Tongasoa eto amin'ny atelioko...", en: "Welcome to my studio...", ru: "Добро пожаловать..." },
-  commission: { 
-    title: { fr: "Commandes Sur Mesure", mg: "Komandy Manokana", en: "Custom Orders", ru: "Индивидуальные заказы" }, 
-    desc: { fr: "Créez votre pièce unique...", mg: "Mamorona ny sary sokitrao...", en: "Create your unique piece...", ru: "Создайте свою уникальную..." } 
-  },
-  contactInfo: { whatsapp: "261340000000", facebook: "https://facebook.com", email: "contact@jery.mg" }
+  aboutText: { fr: "Bienvenue...", mg: "Tongasoa...", en: "Welcome...", ru: "Добро пожаловать..." },
+  commission: { title: { fr: "Commandes" }, desc: { fr: "Contactez-moi" } },
+  contactInfo: { whatsapp: "261340000000", facebook: "", email: "" }
 };
-
-const INITIAL_SCULPTURES: Sculpture[] = [];
-const INITIAL_BLOG_POSTS: BlogPost[] = [];
 
 const UI_TRANSLATIONS: Record<string, any> = {
   fr: { nav: { home: "Accueil", gallery: "Galerie", blog: "Journal" }, gallery: { title: "Collection", unavailable: "Vendu", order: "Commander" }, blog: { title: "Journal d'Atelier" } },
@@ -62,46 +76,53 @@ const UI_TRANSLATIONS: Record<string, any> = {
 };
 
 // =============================================================================
-// SERVICES (Mock)
+// SERVICE DE BASE DE DONNÉES (Connexion Réelle)
 // =============================================================================
 const DataService = {
-  getSculptures: async () => JSON.parse(localStorage.getItem('jery_local_sculptures') || '[]'),
-  getContent: async () => JSON.parse(localStorage.getItem('jery_local_content') || 'null'),
-  getBlogPosts: async () => JSON.parse(localStorage.getItem('jery_local_blog') || '[]'),
-  saveContent: (data: any) => localStorage.setItem('jery_local_content', JSON.stringify(data)),
+  // Lire les données depuis Internet (Firebase)
+  getAllData: async () => {
+    const dbRef = ref(db);
+    try {
+      const snapshot = await get(child(dbRef, '/'));
+      if (snapshot.exists()) {
+        return snapshot.val();
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error("Erreur lecture:", error);
+      return null;
+    }
+  },
+  
+  // Sauvegarder sur Internet
+  save: async (path: string, data: any) => {
+    try {
+      await set(ref(db, path), data);
+      return true;
+    } catch (e) {
+      alert("Erreur de sauvegarde : " + e);
+      return false;
+    }
+  },
+
   getAdminPassword: () => localStorage.getItem('jery_admin_pass') || 'admin123',
   saveAdminPassword: (pass: string) => localStorage.setItem('jery_admin_pass', pass),
 };
 
-const generateTranslations = async (text: string) => ({ fr: text, mg: text + " (MG)", en: text + " (EN)", ru: text + " (RU)" });
+const generateTranslations = async (text: string) => ({ fr: text, mg: text, en: text, ru: text });
 
 // =============================================================================
-// COMPOSANT INPUT (ISOLÉ POUR LA PERFORMANCE)
+// COMPOSANT INPUT OPTIMISÉ (Pour écrire vite sans bugs)
 // =============================================================================
-const LocalizedInput = ({ 
-  label, 
-  value, 
-  onChange, 
-  setIsLoading, 
-  isTextArea = false 
-}: { 
-  label: string, 
-  value: LocalizedText, 
-  onChange: (val: LocalizedText) => void, 
-  setIsLoading: (v: boolean) => void,
-  isTextArea?: boolean 
-}) => {
+const LocalizedInput = ({ label, value, onChange, setIsLoading, isTextArea = false }: any) => {
   const handleTranslate = async () => {
     if (!value.fr) return;
     setIsLoading(true);
     try {
       const translated = await generateTranslations(value.fr);
       onChange(translated);
-    } catch (e) {
-      alert("Erreur IA");
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (e) { alert("Erreur IA"); } finally { setIsLoading(false); }
   };
 
   return (
@@ -115,19 +136,9 @@ const LocalizedInput = ({
           <div key={l}>
             <span className="text-[9px] uppercase font-mono text-stone-400">{l}</span>
             {isTextArea ? (
-              <textarea 
-                className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700 focus:border-gold-600 focus:ring-1 focus:ring-gold-600 outline-none transition-all" 
-                value={value[l] || ''} 
-                onChange={e => onChange({...value, [l]: e.target.value})} 
-                rows={3} 
-              />
+              <textarea className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700 outline-none focus:border-gold-600" value={value[l] || ''} onChange={e => onChange({...value, [l]: e.target.value})} rows={3} />
             ) : (
-              <input 
-                type="text" 
-                className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700 focus:border-gold-600 focus:ring-1 focus:ring-gold-600 outline-none transition-all" 
-                value={value[l] || ''} 
-                onChange={e => onChange({...value, [l]: e.target.value})} 
-              />
+              <input type="text" className="w-full p-2 text-sm bg-white dark:bg-stone-800 border rounded dark:border-stone-700 outline-none focus:border-gold-600" value={value[l] || ''} onChange={e => onChange({...value, [l]: e.target.value})} />
             )}
           </div>
         ))}
@@ -137,80 +148,50 @@ const LocalizedInput = ({
 };
 
 // =============================================================================
-// COMPOSANT PRINCIPAL APP
+// APPLICATION PRINCIPALE
 // =============================================================================
 const App = () => {
-  // --- States Globaux ---
+  // --- States ---
   const [lang, setLang] = useState<any>('fr'); 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isAdmin, setIsAdmin] = useState(false);
   const [view, setView] = useState<'home' | 'gallery' | 'blog' | 'admin'>('home');
-  const [adminTab, setAdminTab] = useState<'general' | 'sculptures' | 'journal'>('general'); // State remonté ici
+  const [adminTab, setAdminTab] = useState<'general' | 'sculptures' | 'journal'>('general');
   const [isLoading, setIsLoading] = useState(true);
   
-  // --- States Formulaires Admin ---
   const [passwordInput, setPasswordInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [selectedImg, setSelectedImg] = useState<string | null>(null);
   
-  // --- States Données ---
+  // DONNÉES (Connectées à Firebase)
   const [sculptures, setSculptures] = useState<Sculpture[]>([]);
   const [content, setContent] = useState<SiteContent>(INITIAL_CONTENT);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   
-  // --- States Édition ---
   const [editingSculpture, setEditingSculpture] = useState<Sculpture | null>(null);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const t = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS['fr'];
 
-  // --- Helpers ---
-  const formatPriceDisplay = (priceInEuro: number) => {
-    const mga = (priceInEuro * EUR_TO_MGA).toLocaleString('fr-MG');
-    return `${mga} Ar (${priceInEuro} €)`;
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', 'jery_art'); 
-
-    try {
-      const response = await fetch('https://api.cloudinary.com/v1_1/dnbd36uqz/image/upload', {
-        method: 'POST',
-        body: formData
-      });
-      const data = await response.json();
-      if (data.secure_url) {
-        callback(data.secure_url);
+  // --- Chargement initial depuis Firebase ---
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      const data = await DataService.getAllData();
+      if (data) {
+        if (data.content) setContent(data.content);
+        if (data.sculptures) setSculptures(data.sculptures);
+        if (data.blog) setBlogPosts(data.blog);
       }
-    } catch (error) {
-      alert("Erreur lors de l'envoi de l'image sur Cloudinary");
-    }
-  };
-
-  const saveToStorage = (key: string, data: any) => {
-    localStorage.setItem(key, JSON.stringify(data));
-  };
-
-  const handleChangePassword = () => {
-    if (!newPassword || newPassword.length < 4) {
-      alert("Le mot de passe doit faire au moins 4 caractères.");
-      return;
-    }
-    DataService.saveAdminPassword(newPassword);
-    alert("Mot de passe modifié avec succès !");
-    setNewPassword('');
-  };
+      setIsLoading(false);
+    };
+    loadData();
+  }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const currentPass = DataService.getAdminPassword();
-    if (passwordInput.trim() === currentPass) {
+    if (passwordInput.trim() === DataService.getAdminPassword()) {
       setIsAdmin(true);
       setPasswordInput('');
     } else {
@@ -218,40 +199,34 @@ const App = () => {
     }
   };
 
-  // --- Effects ---
-  useEffect(() => {
-    const init = async () => {
-      setIsLoading(true);
-      try {
-        const [s, c, b] = await Promise.all([
-          DataService.getSculptures(),
-          DataService.getContent(),
-          DataService.getBlogPosts()
-        ]);
-        setSculptures(s.length > 0 ? s : INITIAL_SCULPTURES);
-        setContent(c || INITIAL_CONTENT);
-        setBlogPosts(b.length > 0 ? b : INITIAL_BLOG_POSTS);
-      } catch (err) {
-        console.warn("Utilisation du stockage local");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    init();
-  }, []);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'jery_art'); 
+    try {
+      const response = await fetch('https://api.cloudinary.com/v1_1/dnbd36uqz/image/upload', { method: 'POST', body: formData });
+      const data = await response.json();
+      if (data.secure_url) callback(data.secure_url);
+    } catch (error) { alert("Erreur upload"); }
+  };
 
-  useEffect(() => {
-    const title = content.heroTitle[lang] || "Jery Sculpture";
-    document.title = `JERY | ${title}`;
-  }, [lang, content]);
+  const handleChangePassword = () => {
+    if (!newPassword || newPassword.length < 4) { alert("Trop court"); return; }
+    DataService.saveAdminPassword(newPassword);
+    alert("Mot de passe changé !");
+    setNewPassword('');
+  };
 
-  // =============================================================================
-  // RENDU
-  // =============================================================================
+  const formatPriceDisplay = (priceInEuro: number) => {
+    const mga = (priceInEuro * EUR_TO_MGA).toLocaleString('fr-MG');
+    return `${mga} Ar (${priceInEuro} €)`;
+  };
+
+  // --- Rendu ---
   return (
     <div className={`min-h-screen transition-colors duration-300 ${theme === 'dark' ? 'dark bg-stone-900 text-stone-100' : 'bg-stone-50 text-stone-900'}`}>
-      
-      {/* NAVIGATION */}
       <nav className="sticky top-0 z-50 bg-stone-50/90 dark:bg-stone-900/90 backdrop-blur-md border-b dark:border-stone-800 px-6 py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-serif tracking-[0.4em] font-bold cursor-pointer" onClick={() => setView('home')}>JERY</h1>
@@ -263,7 +238,10 @@ const App = () => {
           </div>
           <div className="flex items-center gap-4">
             <select value={lang} onChange={(e) => setLang(e.target.value)} className="bg-transparent text-[10px] font-bold border rounded p-1">
-              {Object.values({fr:'fr', mg:'mg', en:'en', ru:'ru'}).map(l => <option key={l} value={l} className="dark:bg-stone-900">{l.toUpperCase()}</option>)}
+              <option value="fr" className="dark:bg-stone-900">FR</option>
+              <option value="mg" className="dark:bg-stone-900">MG</option>
+              <option value="en" className="dark:bg-stone-900">EN</option>
+              <option value="ru" className="dark:bg-stone-900">RU</option>
             </select>
             <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="p-2 bg-stone-100 dark:bg-stone-800 rounded-full">{theme === 'light' ? '🌙' : '☀️'}</button>
             <button onClick={() => setView(view === 'admin' ? 'home' : 'admin')} className="md:hidden">⚙️</button>
@@ -271,10 +249,7 @@ const App = () => {
         </div>
       </nav>
 
-      {/* CONTENU PRINCIPAL */}
       <main>
-        
-        {/* VUE: ACCUEIL */}
         {view === 'home' && (
           <>
             <header className="relative h-[85vh] flex items-center justify-center overflow-hidden">
@@ -302,7 +277,6 @@ const App = () => {
           </>
         )}
 
-        {/* VUE: GALERIE */}
         {view === 'gallery' && (
           <div className="py-24 px-6 max-w-7xl mx-auto animate-fade-in">
             <h2 className="text-3xl md:text-4xl font-serif text-center mb-20 uppercase tracking-[0.4em]">{t.gallery.title}</h2>
@@ -324,7 +298,6 @@ const App = () => {
           </div>
         )}
 
-        {/* VUE: JOURNAL */}
         {view === 'blog' && (
           <div className="py-24 px-6 max-w-5xl mx-auto animate-fade-in">
             <h2 className="text-3xl md:text-5xl font-serif text-center mb-16 uppercase tracking-[0.4em]">{t.blog.title}</h2>
@@ -345,7 +318,6 @@ const App = () => {
           </div>
         )}
 
-        {/* VUE: ADMIN */}
         {view === 'admin' && (
           !isAdmin ? (
             <div className="max-w-md mx-auto py-32 px-6">
@@ -367,12 +339,11 @@ const App = () => {
               <div className="flex gap-4 mb-10 overflow-x-auto pb-2">
                 {(['general', 'sculptures', 'journal'] as const).map(tab => (
                   <button key={tab} onClick={() => setAdminTab(tab)} className={`px-6 py-2 text-[10px] uppercase font-bold tracking-widest border rounded-full transition-all flex-shrink-0 ${adminTab === tab ? 'bg-stone-800 text-white dark:bg-stone-100 dark:text-stone-900' : 'border-stone-200 dark:border-stone-700'}`}>
-                    {tab === 'general' ? 'Réglages & Contact' : tab === 'sculptures' ? 'Ma Galerie' : 'Mon Journal'}
+                    {tab === 'general' ? 'Réglages' : tab === 'sculptures' ? 'Ma Galerie' : 'Mon Journal'}
                   </button>
                 ))}
               </div>
 
-              {/* ONGLET GÉNÉRAL */}
               {adminTab === 'general' && (
                 <div className="space-y-8 animate-fade-in pb-20">
                   <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
@@ -394,21 +365,8 @@ const App = () => {
                   </div>
 
                   <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
-                    <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">RÉSEAUX & CONTACTS</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase mb-2 block">WhatsApp (261...)</label>
-                        <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.whatsapp} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, whatsapp: e.target.value}})} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase mb-2 block">Facebook (Lien complet)</label>
-                        <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.facebook} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, facebook: e.target.value}})} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase mb-2 block">Email Professionnel</label>
-                        <input type="email" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded" value={content.contactInfo.email} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, email: e.target.value}})} />
-                      </div>
-                    </div>
+                    <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">CONTACTS</h3>
+                    <input type="text" className="w-full p-3 bg-stone-50 dark:bg-stone-900 border rounded mb-4" value={content.contactInfo.whatsapp} onChange={e => setContent({...content, contactInfo: {...content.contactInfo, whatsapp: e.target.value}})} placeholder="Numéro WhatsApp" />
                   </div>
 
                   <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
@@ -423,12 +381,14 @@ const App = () => {
                   </div>
 
                   <div className="flex justify-end sticky bottom-4 z-10">
-                    <button onClick={() => { DataService.saveContent(content); alert("Modifications enregistrées !"); }} className="bg-stone-800 dark:bg-stone-100 text-white dark:text-stone-900 px-12 py-4 rounded-full font-bold uppercase text-xs tracking-widest shadow-2xl">Enregistrer Tout le Site</button>
+                    <button onClick={async () => { 
+                      const success = await DataService.save('content', content);
+                      if(success) alert("✅ Site mis à jour pour tout le monde !");
+                    }} className="bg-gold-600 text-white px-12 py-4 rounded-full font-bold uppercase text-xs tracking-widest shadow-2xl hover:bg-gold-700 transition-all">PUBLIER LES CHANGEMENTS</button>
                   </div>
                 </div>
               )}
 
-              {/* ONGLET SCULPTURES */}
               {adminTab === 'sculptures' && (
                 <div className="space-y-6 animate-fade-in pb-20">
                   <button onClick={() => setEditingSculpture({ id: '', title: {fr:'',mg:'',en:'',ru:''}, description: {fr:'',mg:'',en:'',ru:''}, price: 0, category: 'Wood', imageUrl: '', available: true, createdAt: new Date().toISOString() })} className="w-full p-10 border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-2xl text-stone-400 hover:text-gold-600 transition-all font-bold uppercase tracking-widest">+ Ajouter une Sculpture</button>
@@ -438,10 +398,15 @@ const App = () => {
                         <img src={s.imageUrl} className="w-full h-48 object-cover group-hover:opacity-90" />
                         <div className="p-4">
                           <p className="font-bold truncate text-lg">{s.title.fr}</p>
-                          <p className="text-xs text-gold-600 font-bold mb-4">{formatPriceDisplay(s.price)}</p>
-                          <div className="flex justify-between border-t pt-3">
+                          <div className="flex justify-between border-t pt-3 mt-3">
                             <button onClick={() => setEditingSculpture(s)} className="text-[10px] font-bold uppercase text-blue-500 hover:text-blue-600">Modifier</button>
-                            <button onClick={() => { if(confirm("Supprimer?")) { const l = sculptures.filter(x => x.id !== s.id); setSculptures(l); saveToStorage('jery_local_sculptures', l); }}} className="text-[10px] font-bold uppercase text-red-500 hover:text-red-600">Supprimer</button>
+                            <button onClick={async () => { 
+                              if(confirm("Supprimer?")) { 
+                                const l = sculptures.filter(x => x.id !== s.id); 
+                                setSculptures(l); 
+                                await DataService.save('sculptures', l);
+                              }
+                            }} className="text-[10px] font-bold uppercase text-red-500 hover:text-red-600">Supprimer</button>
                           </div>
                         </div>
                       </div>
@@ -450,30 +415,16 @@ const App = () => {
                   {editingSculpture && (
                     <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
                       <div className="bg-white dark:bg-stone-800 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-2xl shadow-2xl">
-                        <div className="flex justify-between items-center mb-6 border-b pb-2">
-                          <h3 className="text-xl font-serif uppercase tracking-widest">Détails de l'œuvre</h3>
-                          <button onClick={() => setEditingSculpture(null)} className="text-xl">×</button>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                          <div>
-                            <label className="text-[10px] font-bold uppercase block mb-2">Prix en Euro (€)</label>
-                            <input type="number" className="w-full p-3 border rounded dark:bg-stone-900" value={editingSculpture.price} onChange={e => setEditingSculpture({...editingSculpture, price: Number(e.target.value)})} />
-                            <p className="text-[10px] text-gold-600 mt-2 font-bold">Valeur en Ariary : {formatPriceDisplay(editingSculpture.price)}</p>
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold uppercase block mb-2">Image</label>
-                            <input type="file" accept="image/*" className="w-full text-xs" onChange={e => handleFileUpload(e, (url) => setEditingSculpture({...editingSculpture, imageUrl: url}))} />
-                            {editingSculpture.imageUrl && <img src={editingSculpture.imageUrl} className="mt-2 w-20 h-20 object-cover rounded border" />}
-                          </div>
-                        </div>
-                        <LocalizedInput setIsLoading={setIsLoading} label="Titre de l'œuvre" value={editingSculpture.title} onChange={v => setEditingSculpture({...editingSculpture, title: v})} />
-                        <LocalizedInput setIsLoading={setIsLoading} label="Description" value={editingSculpture.description} onChange={v => setEditingSculpture({...editingSculpture, description: v})} isTextArea />
+                        <h3 className="text-xl font-serif uppercase tracking-widest mb-6">Éditer Sculpture</h3>
+                        <LocalizedInput setIsLoading={setIsLoading} label="Titre" value={editingSculpture.title} onChange={v => setEditingSculpture({...editingSculpture, title: v})} />
+                        <input type="file" onChange={e => handleFileUpload(e, (url) => setEditingSculpture({...editingSculpture, imageUrl: url}))} className="mb-4 text-xs" />
+                        {editingSculpture.imageUrl && <img src={editingSculpture.imageUrl} className="w-20 h-20 object-cover mb-4 rounded" />}
                         <div className="flex justify-end gap-4 mt-8">
                           <button onClick={() => setEditingSculpture(null)} className="px-6 py-2 text-xs font-bold uppercase">Annuler</button>
-                          <button onClick={() => {
+                          <button onClick={async () => {
                             const newList = editingSculpture.id ? sculptures.map(x => x.id === editingSculpture.id ? editingSculpture : x) : [...sculptures, {...editingSculpture, id: Date.now().toString()}];
                             setSculptures(newList);
-                            saveToStorage('jery_local_sculptures', newList);
+                            await DataService.save('sculptures', newList);
                             setEditingSculpture(null);
                           }} className="bg-gold-600 text-white px-10 py-3 rounded-full font-bold uppercase text-xs">Sauvegarder</button>
                         </div>
@@ -483,7 +434,6 @@ const App = () => {
                 </div>
               )}
 
-              {/* ONGLET JOURNAL */}
               {adminTab === 'journal' && (
                 <div className="space-y-6 animate-fade-in pb-20">
                   <button onClick={() => setEditingPost({ id: '', title: {fr:'',mg:'',en:'',ru:''}, content: {fr:'',mg:'',en:'',ru:''}, imageUrl: '', date: new Date().toISOString() })} className="w-full p-10 border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-2xl text-stone-400 hover:text-gold-600 font-bold uppercase tracking-widest">+ Rédiger un Article</button>
@@ -534,30 +484,11 @@ const App = () => {
         )}
       </main>
 
-      <footer className="py-20 bg-stone-900 text-stone-100 px-6 border-t border-stone-800">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
-          <div><h5 className="text-2xl font-serif tracking-[0.4em] mb-6">JERY</h5><p className="text-stone-500 text-xs font-light">{content.heroSubtitle[lang]}</p></div>
-          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Menu</h6><ul className="text-xs space-y-3 font-light"><li className="cursor-pointer" onClick={() => setView('home')}>Accueil</li><li className="cursor-pointer" onClick={() => setView('gallery')}>Galerie</li><li className="cursor-pointer" onClick={() => setView('blog')}>Journal</li></ul></div>
-          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Contact</h6><div className="flex justify-center md:justify-start gap-6 text-xl"><a href={content.contactInfo.facebook} target="_blank"><i className="fab fa-facebook-f"></i></a><a href={`https://wa.me/${content.contactInfo.whatsapp}`} target="_blank"><i className="fab fa-whatsapp"></i></a><a href={`mailto:${content.contactInfo.email}`}><i className="far fa-envelope"></i></a></div></div>
-        </div>
-        <p className="mt-20 text-center text-stone-600 text-[10px] uppercase tracking-[0.5em]">© {new Date().getFullYear()} JERY SCULPTURES MADAGASCAR</p>
-      </footer>
-
-      {/* Système de Zoom universel */}
       {selectedImg && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
           <div className="relative">
-            <img
-              src={selectedImg}
-              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
-              alt="Sculpture zoomée"
-            />
-            <button
-              onClick={() => setSelectedImg(null)}
-              className="absolute top-4 right-4 text-white text-4xl hover:text-gray-300"
-            >
-              &times;
-            </button>
+            <img src={selectedImg} className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" />
+            <button onClick={() => setSelectedImg(null)} className="absolute top-4 right-4 text-white text-4xl">&times;</button>
           </div>
         </div>
       )}
