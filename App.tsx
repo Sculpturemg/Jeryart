@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, child } from "firebase/database";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // =============================================================================
 // 1. CONFIGURATION
@@ -17,42 +16,51 @@ const firebaseConfig = {
   measurementId: "G-J3ZHPF1P5Z"
 };
 
-// TA CLÉ EST BONNE MAINTENANT
 const GEMINI_API_KEY = "AIzaSyDFY03-j2_tq1VM-MOV9ruroohEJrddSJc"; 
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (RETOUR A LA MÉTHODE OFFICIELLE SDK)
+// 2. FONCTION DE TRADUCTION (MÉTHODE HTTP DIRECTE - 100% FIABLE)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
   try {
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    // ON UTILISE LE MODÈLE LE PLUS RÉCENT ET RAPIDE
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const prompt = `Agis comme un traducteur professionnel. Traduis le texte suivant : "${text}".
-    Langue source : Français.
-    Langues cibles : Malgache (mg), Anglais (en), Russe (ru).
+    // Utilisation de l'API REST directe avec le modèle 'gemini-pro' (le plus stable)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
     
-    IMPORTANT : Ta réponse doit être UNIQUEMENT un objet JSON valide, sans texte autour.
-    Format : { "mg": "...", "en": "...", "ru": "..." }`;
+    const prompt = `Traduis ce texte : "${text}".
+    Source : Français.
+    Cibles : Malgache (mg), Anglais (en), Russe (ru).
+    IMPORTANT : Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const textResponse = response.text();
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
 
-    // Nettoyage pour trouver le JSON
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error?.message || "Erreur inconnue");
+    }
+
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!textResponse) throw new Error("Réponse vide de l'IA");
+
+    // Nettoyage du JSON
     const firstBrace = textResponse.indexOf('{');
     const lastBrace = textResponse.lastIndexOf('}');
-
+    
     if (firstBrace !== -1 && lastBrace !== -1) {
       const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
       const translations = JSON.parse(jsonString);
-
       return {
         fr: text,
         mg: translations.mg || text,
@@ -60,7 +68,7 @@ const generateTranslations = async (text: string) => {
         ru: translations.ru || text
       };
     } else {
-      throw new Error("Format JSON invalide reçu de l'IA");
+      throw new Error("L'IA n'a pas renvoyé de JSON valide.");
     }
 
   } catch (error: any) {
@@ -265,7 +273,7 @@ const App = () => {
         </div>
       </nav>
 
-      {/* ZONE PRINCIPALE */}
+      {/* ZONE PRINCIPALE AVEC FLEX-GROW POUR POUSSER LE FOOTER */}
       <main className="flex-grow w-full">
         {view === 'home' && (
           <>
@@ -522,8 +530,8 @@ const App = () => {
         )}
       </main>
 
-      {/* FOOTER : "w-full" force la pleine largeur, "bg-black" force le noir */}
-      <footer className="w-full py-20 bg-black text-stone-100 px-6 border-t border-stone-800 mt-auto">
+      {/* FOOTER - w-full pour pleine largeur + mt-auto pour rester en bas */}
+      <footer className="w-full py-20 bg-stone-900 text-stone-100 px-6 border-t border-stone-800 mt-auto">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
           <div><h5 className="text-2xl font-serif tracking-[0.4em] mb-6">JERY</h5><p className="text-stone-500 text-xs font-light">{content.heroSubtitle[lang]}</p></div>
           <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Menu</h6><ul className="text-xs space-y-3 font-light"><li className="cursor-pointer" onClick={() => setView('home')}>Accueil</li><li className="cursor-pointer" onClick={() => setView('gallery')}>Galerie</li><li className="cursor-pointer" onClick={() => setView('blog')}>Journal</li></ul></div>
