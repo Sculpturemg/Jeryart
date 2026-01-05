@@ -23,15 +23,15 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (MODELE GEMINI-PRO)
+// 2. FONCTION DE TRADUCTION (RETOUR AU MODELE FLASH - LE BON)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
   try {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    // CHANGEMENT ICI : Utilisation de "gemini-pro" comme demandé
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // ON REVIENT SUR FLASH MAINTENANT QUE LA CLÉ EST BONNE
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `Tu es un expert en traduction. Traduis le texte suivant : "${text}".
     Langue source : Français.
@@ -264,8 +264,8 @@ const App = () => {
         </div>
       </nav>
 
-      {/* ZONE PRINCIPALE : flex-grow permet de pousser le footer en bas */}
-      <main className="flex-grow">
+      {/* ZONE PRINCIPALE : flex-1 assure que le footer est poussé en bas */}
+      <main className="flex-1">
         {view === 'home' && (
           <>
             <header className="relative h-[85vh] flex items-center justify-center overflow-hidden">
@@ -519,22 +519,6 @@ const App = () => {
           )
         )}
       </main>
-
-      {/* FOOTER : "w-full" force la pleine largeur, "bg-black" force le noir */}
-      <footer className="w-full py-20 bg-black text-stone-100 px-6 border-t border-stone-800 mt-auto">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
-          <div><h5 className="text-2xl font-serif tracking-[0.4em] mb-6">JERY</h5><p className="text-stone-500 text-xs font-light">{content.heroSubtitle[lang]}</p></div>
-          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Menu</h6><ul className="text-xs space-y-3 font-light"><li className="cursor-pointer" onClick={() => setView('home')}>Accueil</li><li className="cursor-pointer" onClick={() => setView('gallery')}>Galerie</li><li className="cursor-pointer" onClick={() => setView('blog')}>Journal</li></ul></div>
-          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Contact</h6>
-            <div className="flex flex-col gap-2 text-sm text-stone-400">
-              {content.contactInfo.facebook && <a href={content.contactInfo.facebook} target="_blank" className="hover:text-white">Facebook</a>}
-              {content.contactInfo.whatsapp && <a href={`https://wa.me/${content.contactInfo.whatsapp}`} target="_blank" className="hover:text-white">WhatsApp</a>}
-              {content.contactInfo.email && <a href={`mailto:${content.contactInfo.email}`} className="hover:text-white">{content.contactInfo.email}</a>}
-            </div>
-          </div>
-        </div>
-        <p className="mt-20 text-center text-stone-600 text-[10px] uppercase tracking-[0.5em]">© {new Date().getFullYear()} JERY SCULPTURES MADAGASCAR</p>
-      </footer>
 
       {/* MODALE DE ZOOM */}
       {selectedSculpture && (
