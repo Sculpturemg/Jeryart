@@ -22,60 +22,56 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (URL MISE À JOUR : FLASH 1.5)
+// 2. FONCTION DE TRADUCTION "BLINDÉE" (MULTI-ESSAIS)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
+
+  const prompt = `Traduis : "${text}". Source: Français. Cibles: Malgache (mg), Anglais (en), Russe (ru). Réponds UNIQUEMENT JSON : { "mg": "...", "en": "...", "ru": "..." }`;
   
-  try {
-    // CORRECTION ICI : On pointe vers gemini-1.5-flash qui est le modèle actif
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-    
-    const prompt = `Traduis ce texte : "${text}".
-    Source : Français.
-    Cibles : Malgache (mg), Anglais (en), Russe (ru).
-    IMPORTANT : Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
+  // Liste des URLs à tester dans l'ordre (si la 1ère échoue, on tente la 2ème, etc.)
+  const urlsToTry = [
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`
+  ];
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    });
+  for (const url of urlsToTry) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
 
-    if (!response.ok) {
-      const errData = await response.json();
-      throw new Error(errData.error?.message || `Erreur HTTP ${response.status}`);
+      if (response.ok) {
+        const data = await response.json();
+        const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        // Extraction du JSON
+        const firstBrace = textResponse.indexOf('{');
+        const lastBrace = textResponse.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
+          const translations = JSON.parse(jsonString);
+          // Si on arrive ici, c'est que ça a marché ! On retourne le résultat.
+          return {
+            fr: text,
+            mg: translations.mg || text,
+            en: translations.en || text,
+            ru: translations.ru || text
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("Échec sur une version de l'API, tentative suivante...", e);
+      // On continue la boucle pour essayer l'URL suivante
     }
-
-    const data = await response.json();
-    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!textResponse) throw new Error("Réponse vide de l'IA");
-
-    // Nettoyage du JSON
-    const firstBrace = textResponse.indexOf('{');
-    const lastBrace = textResponse.lastIndexOf('}');
-    
-    if (firstBrace !== -1 && lastBrace !== -1) {
-      const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
-      const translations = JSON.parse(jsonString);
-      return {
-        fr: text,
-        mg: translations.mg || text,
-        en: translations.en || text,
-        ru: translations.ru || text
-      };
-    } else {
-      throw new Error("L'IA n'a pas renvoyé de JSON valide.");
-    }
-
-  } catch (error: any) {
-    console.error("Erreur Traduction:", error);
-    alert("Erreur Traduction : " + error.message);
-    return { fr: text, mg: text, en: text, ru: text };
   }
+
+  // Si tout a échoué
+  alert("Échec de traduction sur tous les serveurs Google. Vérifiez votre connexion.");
+  return { fr: text, mg: text, en: text, ru: text };
 };
 
 // =============================================================================
@@ -273,7 +269,7 @@ const App = () => {
         </div>
       </nav>
 
-      {/* ZONE PRINCIPALE AVEC FLEX-GROW POUR LE FOOTER */}
+      {/* ZONE PRINCIPALE : flex-grow POUSSE LE FOOTER EN BAS */}
       <main className="flex-grow w-full">
         {view === 'home' && (
           <>
@@ -530,7 +526,7 @@ const App = () => {
         )}
       </main>
 
-      {/* FOOTER AVEC Z-INDEX ÉLEVÉ ET POSITIONNEMENT FORCÉ */}
+      {/* FOOTER : w-full + bg-black forcés pour être sûr qu'il se voit */}
       <footer className="w-full py-20 bg-black text-stone-100 px-6 border-t border-stone-800 mt-auto z-10 relative">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
           <div><h5 className="text-2xl font-serif tracking-[0.4em] mb-6">JERY</h5><p className="text-stone-500 text-xs font-light">{content.heroSubtitle[lang]}</p></div>
