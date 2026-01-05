@@ -17,21 +17,21 @@ const firebaseConfig = {
   measurementId: "G-J3ZHPF1P5Z"
 };
 
-// TA CLÉ CORRIGÉE EST ICI 👇
 const GEMINI_API_KEY = "AIzaSyBP2AVjRM-RE5-J99u-XVODU_-gHl_xpO0"; 
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (VERSION DEBUG ET ROBUSTE)
+// 2. FONCTION DE TRADUCTION (CORRIGÉE : MODELE GEMINI-PRO)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
   try {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // CHANGEMENT ICI : Utilisation du modèle stable "gemini-pro"
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const prompt = `Tu es un expert en traduction. Traduis le texte suivant : "${text}".
     Langue source : Français.
@@ -45,7 +45,7 @@ const generateTranslations = async (text: string) => {
     const response = await result.response;
     const textResponse = response.text();
 
-    // Nettoyage agressif pour trouver le JSON même s'il y a du texte autour
+    // Nettoyage agressif pour trouver le JSON
     const firstBrace = textResponse.indexOf('{');
     const lastBrace = textResponse.lastIndexOf('}');
 
@@ -55,9 +55,9 @@ const generateTranslations = async (text: string) => {
 
       return {
         fr: text,
-        mg: translations.mg || text + " (Erreur MG)",
-        en: translations.en || text + " (Erreur EN)",
-        ru: translations.ru || text + " (Erreur RU)"
+        mg: translations.mg || text,
+        en: translations.en || text,
+        ru: translations.ru || text
       };
     } else {
       throw new Error("Format de réponse IA invalide (pas de JSON trouvé)");
@@ -66,7 +66,6 @@ const generateTranslations = async (text: string) => {
   } catch (error: any) {
     console.error("Erreur Traduction:", error);
     alert("Erreur de traduction : " + error.message);
-    
     return { fr: text, mg: text, en: text, ru: text };
   }
 };
@@ -185,8 +184,6 @@ const App = () => {
   
   const [passwordInput, setPasswordInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  
-  // MODIFICATION : Au lieu de stocker juste une image, on stocke toute la sculpture pour le zoom
   const [selectedSculpture, setSelectedSculpture] = useState<Sculpture | null>(null);
   
   const [sculptures, setSculptures] = useState<Sculpture[]>([]);
@@ -268,7 +265,7 @@ const App = () => {
         </div>
       </nav>
 
-      {/* flex-1 permet de pousser le footer en bas si le contenu est court */}
+      {/* ZONE PRINCIPALE (FLEX-1 POUR POUSSER LE FOOTER) */}
       <main className="flex-1">
         {view === 'home' && (
           <>
@@ -525,7 +522,23 @@ const App = () => {
         )}
       </main>
 
-      {/* MODALE DE ZOOM AMÉLIORÉE (AFFICHE MAINTENANT LA DESCRIPTION) */}
+      {/* FOOTER CORRECTEMENT PLACÉ */}
+      <footer className="py-20 bg-black text-stone-100 px-6 border-t border-stone-800 w-full">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
+          <div><h5 className="text-2xl font-serif tracking-[0.4em] mb-6">JERY</h5><p className="text-stone-500 text-xs font-light">{content.heroSubtitle[lang]}</p></div>
+          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Menu</h6><ul className="text-xs space-y-3 font-light"><li className="cursor-pointer" onClick={() => setView('home')}>Accueil</li><li className="cursor-pointer" onClick={() => setView('gallery')}>Galerie</li><li className="cursor-pointer" onClick={() => setView('blog')}>Journal</li></ul></div>
+          <div><h6 className="text-[10px] uppercase tracking-[0.3em] font-bold text-gold-500 mb-6">Contact</h6>
+            <div className="flex flex-col gap-2 text-sm text-stone-400">
+              {content.contactInfo.facebook && <a href={content.contactInfo.facebook} target="_blank" className="hover:text-white">Facebook</a>}
+              {content.contactInfo.whatsapp && <a href={`https://wa.me/${content.contactInfo.whatsapp}`} target="_blank" className="hover:text-white">WhatsApp</a>}
+              {content.contactInfo.email && <a href={`mailto:${content.contactInfo.email}`} className="hover:text-white">{content.contactInfo.email}</a>}
+            </div>
+          </div>
+        </div>
+        <p className="mt-20 text-center text-stone-600 text-[10px] uppercase tracking-[0.5em]">© {new Date().getFullYear()} JERY SCULPTURES MADAGASCAR</p>
+      </footer>
+
+      {/* MODALE DE ZOOM */}
       {selectedSculpture && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
           <div className="relative max-w-5xl w-full flex flex-col md:flex-row bg-white dark:bg-stone-800 rounded-lg overflow-hidden shadow-2xl">
