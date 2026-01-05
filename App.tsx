@@ -17,21 +17,21 @@ const firebaseConfig = {
   measurementId: "G-J3ZHPF1P5Z"
 };
 
-// TA BONNE CLÉ EST ICI 👇
-const GEMINI_API_KEY = "AIzaSyBP2AVjRM-RE5-J99u-XVODU_-gHl_xpO0"; 
+// TA NOUVELLE CLÉ EST ICI 👇
+const GEMINI_API_KEY = "AIzaSyDFY03-j2_tq1VM-MOV9ruroohEJrddSJc"; 
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (RETOUR AU MODELE FLASH AVEC LA BONNE CLÉ)
+// 2. FONCTION DE TRADUCTION (AVEC LE MODELE RAPIDE FLASH)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
   try {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    // ON REVIENT SUR LE MODÈLE RAPIDE ET MODERNE
+    // On utilise le modèle Flash qui est très rapide et gratuit
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `Tu es un expert en traduction. Traduis le texte suivant : "${text}".
