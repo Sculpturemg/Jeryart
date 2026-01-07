@@ -22,56 +22,70 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. TRADUCTION (MÉTHODE ROBUSTE V1BETA)
+// 2. FONCTION DE TRADUCTION "MULTI-MODÈLES" (ANTI-ERREUR 404)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
-  try {
-    // On utilise gemini-1.5-flash via l'API REST v1beta (plus stable pour les clés gratuites)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-    
-    const prompt = `Traduis ce texte : "${text}".
-    Source : Français.
-    Cibles : Malgache (mg), Anglais (en), Russe (ru).
-    IMPORTANT : Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
+  // Liste des modèles à tester dans l'ordre de priorité
+  const modelsToTry = [
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-pro"
+  ];
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    });
+  for (const modelName of modelsToTry) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+      
+      const prompt = `Traduis : "${text}".
+      Source : Français.
+      Cibles : Malgache (mg), Anglais (en), Russe (ru).
+      IMPORTANT : Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
 
-    if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
 
-    const data = await response.json();
-    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      // Si ce modèle échoue (404 ou autre), on passe au suivant dans la boucle
+      if (!response.ok) {
+        console.warn(`Le modèle ${modelName} a échoué, essai du suivant...`);
+        continue; 
+      }
 
-    if (!textResponse) throw new Error("Réponse vide de l'IA");
+      const data = await response.json();
+      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    const firstBrace = textResponse.indexOf('{');
-    const lastBrace = textResponse.lastIndexOf('}');
-    
-    if (firstBrace !== -1 && lastBrace !== -1) {
-      const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
-      const translations = JSON.parse(jsonString);
-      return {
-        fr: text,
-        mg: translations.mg || text,
-        en: translations.en || text,
-        ru: translations.ru || text
-      };
-    } else {
-      throw new Error("Format JSON invalide");
+      if (!textResponse) continue;
+
+      // Nettoyage du JSON
+      const firstBrace = textResponse.indexOf('{');
+      const lastBrace = textResponse.lastIndexOf('}');
+      
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
+        const translations = JSON.parse(jsonString);
+        
+        // Si on arrive ici, c'est que ça a marché ! On renvoie le résultat.
+        return {
+          fr: text,
+          mg: translations.mg || text,
+          en: translations.en || text,
+          ru: translations.ru || text
+        };
+      }
+
+    } catch (error) {
+      console.error(`Erreur avec ${modelName}:`, error);
+      // On continue vers le modèle suivant
     }
-
-  } catch (error: any) {
-    console.error("Erreur Traduction:", error);
-    alert("Erreur Traduction : " + error.message);
-    return { fr: text, mg: text, en: text, ru: text };
   }
+
+  // Si on arrive ici, c'est que TOUS les modèles ont échoué
+  alert("Erreur Traduction : Impossible de contacter Google Gemini.");
+  return { fr: text, mg: text, en: text, ru: text };
 };
 
 // =============================================================================
@@ -104,7 +118,7 @@ interface SiteContent {
   heroSubtitle: LocalizedText;
   heroImageUrl: string;
   aboutText: LocalizedText;
-  commission: { title: LocalizedText; desc: LocalizedText; imageUrl: string }; // AJOUT: imageUrl pour la section commande
+  commission: { title: LocalizedText; desc: LocalizedText };
   contactInfo: { whatsapp: string; facebook: string; email: string };
 }
 
@@ -115,12 +129,8 @@ const INITIAL_CONTENT: SiteContent = {
   heroSubtitle: { fr: "Sculptures Uniques à Madagascar", mg: "Sary Sokitra miavaka eto Madagasikara", en: "Unique Sculptures in Madagascar", ru: "Уникальные скульптуры на Мадагаскаре" },
   heroImageUrl: "https://images.unsplash.com/photo-1544531586-fde5298cdd40?q=80&w=1920",
   aboutText: { fr: "Bienvenue...", mg: "Tongasoa...", en: "Welcome...", ru: "Добро пожаловать..." },
-  commission: { 
-    title: { fr: "Commandes" }, 
-    desc: { fr: "Contactez-moi" },
-    imageUrl: "https://images.unsplash.com/photo-1505567745926-ba89000d255a?q=80&w=800" // Image par défaut modifiable
-  },
-  contactInfo: { whatsapp: "261340000000", facebook: "", email: "" }
+  commission: { title: { fr: "Commandes" }, desc: { fr: "Contactez-moi" } },
+  contactInfo: { whatsapp: "261340000000", facebook: "https://facebook.com", email: "contact@jery.mg" }
 };
 
 const UI_TRANSLATIONS: Record<string, any> = {
@@ -201,7 +211,7 @@ const App = () => {
   const [editingSculpture, setEditingSculpture] = useState<Sculpture | null>(null);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef2 = useRef<HTMLInputElement>(null); // Nouveau ref pour l'image de commande
+  const fileInputRef2 = useRef<HTMLInputElement>(null);
 
   const t = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS['fr'];
 
@@ -211,8 +221,8 @@ const App = () => {
       const data = await DataService.getAllData();
       if (data) {
         if (data.content) {
-          // Fusion pour être sûr d'avoir tous les champs (notamment la nouvelle image commande)
-          setContent({...INITIAL_CONTENT, ...data.content, commission: {...INITIAL_CONTENT.commission, ...data.content.commission}});
+          // Fusion pour être sûr d'avoir tous les champs
+          setContent(prev => ({...INITIAL_CONTENT, ...data.content, commission: {...INITIAL_CONTENT.commission, ...data.content.commission}}));
         }
         if (data.sculptures) setSculptures(data.sculptures);
         if (data.blog) setBlogPosts(data.blog);
@@ -253,7 +263,7 @@ const App = () => {
     return `${mga} Ar (${priceInEuro} €)`;
   };
 
-  // --- ECRAN DE CHARGEMENT (Pour éviter le flash de l'image) ---
+  // ECRAN DE CHARGEMENT
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -289,7 +299,6 @@ const App = () => {
         </div>
       </nav>
 
-      {/* ZONE PRINCIPALE */}
       <main className="flex-grow w-full">
         {view === 'home' && (
           <>
