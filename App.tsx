@@ -22,64 +22,70 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. TRADUCTION VIA HTTP DIRECT (SANS SDK) - MÉTHODE INFAILLIBLE
+// 2. FONCTION DE TRADUCTION "MULTI-ESSAIS" (POUR FORCER LE PASSAGE)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
-  try {
-    // On appelle directement l'API REST de Google. C'est universel.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-    
-    const prompt = `Agis comme un traducteur JSON.
-    Traduis : "${text}".
-    Source : Français.
-    Cibles : Malgache (mg), Anglais (en), Russe (ru).
-    Format JSON strict : { "mg": "...", "en": "...", "ru": "..." }`;
+  // Liste des URLs à tester (Si la 1ère échoue, on tente la suivante)
+  const urlsToTry = [
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`
+  ];
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    });
+  const prompt = `Traduis : "${text}".
+  Source : Français.
+  Cibles : Malgache (mg), Anglais (en), Russe (ru).
+  IMPORTANT : Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error?.message || "Erreur Google inconnue");
+  // On boucle sur les URLs jusqu'à ce que ça marche
+  for (const url of urlsToTry) {
+    try {
+      console.log("Tentative avec :", url);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      if (!response.ok) {
+        // Si erreur 404 ou autre, on passe au suivant sans planter
+        console.warn(`Echec sur ${url}, essai suivant...`);
+        continue; 
+      }
+
+      const data = await response.json();
+      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!textResponse) continue;
+
+      // Nettoyage du JSON
+      const firstBrace = textResponse.indexOf('{');
+      const lastBrace = textResponse.lastIndexOf('}');
+      
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
+        const translations = JSON.parse(jsonString);
+        
+        // VICTOIRE ! On retourne le résultat
+        return {
+          fr: text,
+          mg: translations.mg || text,
+          en: translations.en || text,
+          ru: translations.ru || text
+        };
+      }
+    } catch (error) {
+      console.error("Erreur technique sur une version, on continue...", error);
     }
-
-    const data = await response.json();
-    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!textResponse) throw new Error("Réponse vide de l'IA");
-
-    // Nettoyage pour trouver le JSON
-    const firstBrace = textResponse.indexOf('{');
-    const lastBrace = textResponse.lastIndexOf('}');
-    
-    if (firstBrace !== -1 && lastBrace !== -1) {
-      const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
-      const translations = JSON.parse(jsonString);
-
-      return {
-        fr: text,
-        mg: translations.mg || text,
-        en: translations.en || text,
-        ru: translations.ru || text
-      };
-    } else {
-      // Si l'IA a répondu mais pas en JSON, on garde le texte d'origine
-      console.warn("L'IA n'a pas renvoyé de JSON valide");
-      return { fr: text, mg: text, en: text, ru: text };
-    }
-
-  } catch (error: any) {
-    console.error("Erreur Traduction:", error);
-    alert("Problème de traduction : " + error.message);
-    return { fr: text, mg: text, en: text, ru: text };
   }
+
+  // Si on arrive ici, c'est que les 3 méthodes ont échoué
+  alert("Erreur Traduction : Impossible de contacter Google Gemini (Tous les modèles ont échoué).");
+  return { fr: text, mg: text, en: text, ru: text };
 };
 
 // =============================================================================
