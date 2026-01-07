@@ -16,26 +16,26 @@ const firebaseConfig = {
   measurementId: "G-J3ZHPF1P5Z"
 };
 
-// TA CLÉ ACTUELLE
-const GEMINI_API_KEY = "AIzaSyDFY03-j2_tq1VM-MOV9ruroohEJrddSJc";
+// TA CLÉ
+const GEMINI_API_KEY = "AIzaSyDFY03-j2_tq1VM-MOV9ruroohEJrddSJc"; 
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (MÉTHODE HTTP DIRECTE SIMPLIFIÉE)
+// 2. FONCTION DE TRADUCTION (RETOUR AU CLASSIQUE GEMINI-PRO)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
-
+  
   try {
-    // URL directe vers le modèle standard 1.5 Flash
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-    const prompt = `Traduis ce texte : "${text}".
+    // ON UTILISE LE MODÈLE 'gemini-pro' QUI EST LE PLUS RÉPANDU
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const prompt = `Traduis : "${text}".
     Source : Français.
     Cibles : Malgache (mg), Anglais (en), Russe (ru).
-    Format de réponse JSON strict : { "mg": "...", "en": "...", "ru": "..." }`;
+    IMPORTANT : Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
 
     const response = await fetch(url, {
       method: "POST",
@@ -47,15 +47,18 @@ const generateTranslations = async (text: string) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error?.message || "Erreur Google inconnue");
+      // On affiche l'erreur exacte dans l'alerte pour comprendre
+      throw new Error(errorData.error?.message || `Erreur HTTP ${response.status}`);
     }
 
     const data = await response.json();
+    
+    // Gemini Pro renvoie parfois la réponse différemment, on sécurise
     const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (!textResponse) throw new Error("Réponse vide");
+    if (!textResponse) throw new Error("Réponse vide de Google");
 
-    // Nettoyage JSON (Recherche des accolades)
+    // Nettoyage JSON
     const firstBrace = textResponse.indexOf("{");
     const lastBrace = textResponse.lastIndexOf("}");
 
@@ -69,11 +72,11 @@ const generateTranslations = async (text: string) => {
         ru: translations.ru || text,
       };
     } else {
-      throw new Error("Format invalide");
+      throw new Error("Format invalide reçu");
     }
   } catch (error: any) {
     console.error("Erreur Traduction:", error);
-    alert("Détail de l'erreur : " + error.message);
+    alert("Erreur Google : " + error.message);
     return { fr: text, mg: text, en: text, ru: text };
   }
 };
@@ -256,6 +259,7 @@ const App = () => {
     return `${mga} Ar (${priceInEuro} €)`;
   };
 
+  // ECRAN DE CHARGEMENT
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
