@@ -22,56 +22,56 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION "BLINDÉE" (MULTI-ESSAIS)
+// 2. TRADUCTION (MÉTHODE ROBUSTE V1BETA)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
-
-  const prompt = `Traduis : "${text}". Source: Français. Cibles: Malgache (mg), Anglais (en), Russe (ru). Réponds UNIQUEMENT JSON : { "mg": "...", "en": "...", "ru": "..." }`;
   
-  // Liste des URLs à tester dans l'ordre (si la 1ère échoue, on tente la 2ème, etc.)
-  const urlsToTry = [
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-    `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`
-  ];
+  try {
+    // On utilise gemini-1.5-flash via l'API REST v1beta (plus stable pour les clés gratuites)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const prompt = `Traduis ce texte : "${text}".
+    Source : Français.
+    Cibles : Malgache (mg), Anglais (en), Russe (ru).
+    IMPORTANT : Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
 
-  for (const url of urlsToTry) {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-        // Extraction du JSON
-        const firstBrace = textResponse.indexOf('{');
-        const lastBrace = textResponse.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1) {
-          const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
-          const translations = JSON.parse(jsonString);
-          // Si on arrive ici, c'est que ça a marché ! On retourne le résultat.
-          return {
-            fr: text,
-            mg: translations.mg || text,
-            en: translations.en || text,
-            ru: translations.ru || text
-          };
-        }
-      }
-    } catch (e) {
-      console.warn("Échec sur une version de l'API, tentative suivante...", e);
-      // On continue la boucle pour essayer l'URL suivante
+    if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
+
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!textResponse) throw new Error("Réponse vide de l'IA");
+
+    const firstBrace = textResponse.indexOf('{');
+    const lastBrace = textResponse.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
+      const translations = JSON.parse(jsonString);
+      return {
+        fr: text,
+        mg: translations.mg || text,
+        en: translations.en || text,
+        ru: translations.ru || text
+      };
+    } else {
+      throw new Error("Format JSON invalide");
     }
-  }
 
-  // Si tout a échoué
-  alert("Échec de traduction sur tous les serveurs Google. Vérifiez votre connexion.");
-  return { fr: text, mg: text, en: text, ru: text };
+  } catch (error: any) {
+    console.error("Erreur Traduction:", error);
+    alert("Erreur Traduction : " + error.message);
+    return { fr: text, mg: text, en: text, ru: text };
+  }
 };
 
 // =============================================================================
@@ -104,7 +104,7 @@ interface SiteContent {
   heroSubtitle: LocalizedText;
   heroImageUrl: string;
   aboutText: LocalizedText;
-  commission: { title: LocalizedText; desc: LocalizedText };
+  commission: { title: LocalizedText; desc: LocalizedText; imageUrl: string }; // AJOUT: imageUrl pour la section commande
   contactInfo: { whatsapp: string; facebook: string; email: string };
 }
 
@@ -115,8 +115,12 @@ const INITIAL_CONTENT: SiteContent = {
   heroSubtitle: { fr: "Sculptures Uniques à Madagascar", mg: "Sary Sokitra miavaka eto Madagasikara", en: "Unique Sculptures in Madagascar", ru: "Уникальные скульптуры на Мадагаскаре" },
   heroImageUrl: "https://images.unsplash.com/photo-1544531586-fde5298cdd40?q=80&w=1920",
   aboutText: { fr: "Bienvenue...", mg: "Tongasoa...", en: "Welcome...", ru: "Добро пожаловать..." },
-  commission: { title: { fr: "Commandes" }, desc: { fr: "Contactez-moi" } },
-  contactInfo: { whatsapp: "261340000000", facebook: "https://facebook.com", email: "contact@jery.mg" }
+  commission: { 
+    title: { fr: "Commandes" }, 
+    desc: { fr: "Contactez-moi" },
+    imageUrl: "https://images.unsplash.com/photo-1505567745926-ba89000d255a?q=80&w=800" // Image par défaut modifiable
+  },
+  contactInfo: { whatsapp: "261340000000", facebook: "", email: "" }
 };
 
 const UI_TRANSLATIONS: Record<string, any> = {
@@ -197,6 +201,7 @@ const App = () => {
   const [editingSculpture, setEditingSculpture] = useState<Sculpture | null>(null);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef2 = useRef<HTMLInputElement>(null); // Nouveau ref pour l'image de commande
 
   const t = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS['fr'];
 
@@ -205,7 +210,10 @@ const App = () => {
       setIsLoading(true);
       const data = await DataService.getAllData();
       if (data) {
-        if (data.content) setContent(data.content);
+        if (data.content) {
+          // Fusion pour être sûr d'avoir tous les champs (notamment la nouvelle image commande)
+          setContent({...INITIAL_CONTENT, ...data.content, commission: {...INITIAL_CONTENT.commission, ...data.content.commission}});
+        }
         if (data.sculptures) setSculptures(data.sculptures);
         if (data.blog) setBlogPosts(data.blog);
       }
@@ -245,6 +253,18 @@ const App = () => {
     return `${mga} Ar (${priceInEuro} €)`;
   };
 
+  // --- ECRAN DE CHARGEMENT (Pour éviter le flash de l'image) ---
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-serif tracking-widest mb-4 animate-pulse">J E R Y</h1>
+          <div className="w-12 h-12 border-4 border-gold-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-300 ${theme === 'dark' ? 'dark bg-stone-900 text-stone-100' : 'bg-stone-50 text-stone-900'}`}>
       <nav className="sticky top-0 z-50 bg-stone-50/90 dark:bg-stone-900/90 backdrop-blur-md border-b dark:border-stone-800 px-6 py-4">
@@ -269,7 +289,7 @@ const App = () => {
         </div>
       </nav>
 
-      {/* ZONE PRINCIPALE : flex-grow POUSSE LE FOOTER EN BAS */}
+      {/* ZONE PRINCIPALE */}
       <main className="flex-grow w-full">
         {view === 'home' && (
           <>
@@ -292,7 +312,9 @@ const App = () => {
                       <p className="text-stone-600 dark:text-stone-400 font-light leading-relaxed whitespace-pre-line">{content.commission.desc[lang]}</p>
                       <button onClick={() => window.open(`https://wa.me/${content.contactInfo.whatsapp}`, '_blank')} className="px-10 py-4 border-2 border-stone-800 dark:border-stone-200 font-bold uppercase tracking-widest text-[10px] hover:bg-stone-800 hover:text-white dark:hover:bg-stone-200 dark:hover:text-stone-900 transition-all">Demander un Devis</button>
                    </div>
-                   <div className="order-1 md:order-2"><img src="https://images.unsplash.com/photo-1544531586-fde5298cdd40?q=80&w=800" className="w-full h-[400px] object-cover rounded-lg shadow-2xl" /></div>
+                   <div className="order-1 md:order-2">
+                     <img src={content.commission.imageUrl || "https://images.unsplash.com/photo-1505567745926-ba89000d255a?q=80&w=800"} className="w-full h-[400px] object-cover rounded-lg shadow-2xl" />
+                   </div>
                 </div>
             </section>
           </>
@@ -305,7 +327,6 @@ const App = () => {
               {sculptures.map(s => (
                 <div key={s.id} className="group">
                   <div className="relative overflow-hidden aspect-square mb-6 bg-stone-200 dark:bg-stone-800 rounded-lg">
-                    {/* On clique sur l'image pour ouvrir le détail */}
                     <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer" onClick={() => setSelectedSculpture(s)} />
                     {!s.available && <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] px-3 py-1 font-bold">{t.gallery.unavailable}</div>}
                   </div>
@@ -368,6 +389,7 @@ const App = () => {
 
               {adminTab === 'general' && (
                 <div className="space-y-8 animate-fade-in pb-20">
+                  {/* HERO */}
                   <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
                     <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">HÉROS & ACCUEIL</h3>
                     <div className="flex flex-col md:flex-row gap-6 items-center mb-8">
@@ -381,11 +403,27 @@ const App = () => {
                     <LocalizedInput setIsLoading={setIsLoading} label="Sous-titre" value={content.heroSubtitle} onChange={v => setContent({...content, heroSubtitle: v})} />
                   </div>
 
+                  {/* BIO */}
                   <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
                     <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">HISTOIRE & À PROPOS</h3>
                     <LocalizedInput setIsLoading={setIsLoading} label="Texte Biographie" value={content.aboutText} onChange={v => setContent({...content, aboutText: v})} isTextArea />
                   </div>
 
+                  {/* COMMANDES & IMAGE COMMANDE */}
+                  <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
+                    <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">SECTION COMMANDES</h3>
+                    <div className="flex flex-col md:flex-row gap-6 items-center mb-8">
+                      <img src={content.commission.imageUrl || "https://via.placeholder.com/150"} className="w-48 h-32 object-cover rounded-lg shadow-md border" />
+                      <div className="flex-1 w-full">
+                          <button onClick={() => fileInputRef2.current?.click()} className="w-full p-4 border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-lg text-stone-400 font-bold text-xs uppercase hover:text-gold-600">Changer l'image commande</button>
+                          <input type="file" accept="image/*" className="hidden" ref={fileInputRef2} onChange={e => handleFileUpload(e, (url) => setContent({...content, commission: {...content.commission, imageUrl: url}}))} />
+                      </div>
+                    </div>
+                    <LocalizedInput setIsLoading={setIsLoading} label="Titre Section" value={content.commission.title} onChange={v => setContent({...content, commission: {...content.commission, title: v}})} />
+                    <LocalizedInput setIsLoading={setIsLoading} label="Description Section" value={content.commission.desc} onChange={v => setContent({...content, commission: {...content.commission, desc: v}})} isTextArea />
+                  </div>
+
+                  {/* CONTACTS */}
                   <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
                     <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">CONTACTS</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -404,6 +442,7 @@ const App = () => {
                     </div>
                   </div>
 
+                  {/* SECURITE */}
                   <div className="bg-white dark:bg-stone-800 p-6 rounded-xl border dark:border-stone-700">
                     <h3 className="font-serif text-lg mb-6 border-l-4 border-gold-600 pl-4">SÉCURITÉ</h3>
                     <div className="max-w-xs">
