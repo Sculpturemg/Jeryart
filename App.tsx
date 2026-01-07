@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, child } from "firebase/database";
+// On importe la librairie officielle
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // =============================================================================
 // 1. CONFIGURATION
@@ -22,70 +24,58 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION "MULTI-MODÈLES" (ANTI-ERREUR 404)
+// 2. FONCTION DE TRADUCTION (AVEC SÉCURITÉ NAVIGATEUR DÉSACTIVÉE)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
-  // Liste des modèles à tester dans l'ordre de priorité
-  const modelsToTry = [
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-latest",
-    "gemini-pro"
-  ];
+  try {
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    
+    // C'EST ICI LA CLÉ DU SUCCÈS : on force le modèle à accepter le navigateur
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+    });
 
-  for (const modelName of modelsToTry) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
-      
-      const prompt = `Traduis : "${text}".
-      Source : Français.
-      Cibles : Malgache (mg), Anglais (en), Russe (ru).
-      IMPORTANT : Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
+    const prompt = `Agis comme un système de traduction JSON.
+    Texte à traduire : "${text}"
+    Langue source : Français
+    Langues cibles : Malgache (mg), Anglais (en), Russe (ru)
+    
+    Format de réponse OBLIGATOIRE (JSON pur sans markdown) :
+    { "mg": "...", "en": "...", "ru": "..." }`;
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const textResponse = response.text();
 
-      // Si ce modèle échoue (404 ou autre), on passe au suivant dans la boucle
-      if (!response.ok) {
-        console.warn(`Le modèle ${modelName} a échoué, essai du suivant...`);
-        continue; 
-      }
+    // Nettoyage du JSON (au cas où l'IA ajoute des ```json)
+    const jsonString = textResponse.replace(/```json|```/g, '').trim();
+    
+    // On cherche les accolades pour être sûr
+    const firstBrace = jsonString.indexOf('{');
+    const lastBrace = jsonString.lastIndexOf('}');
 
-      const data = await response.json();
-      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      const cleanJson = jsonString.substring(firstBrace, lastBrace + 1);
+      const translations = JSON.parse(cleanJson);
 
-      if (!textResponse) continue;
-
-      // Nettoyage du JSON
-      const firstBrace = textResponse.indexOf('{');
-      const lastBrace = textResponse.lastIndexOf('}');
-      
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
-        const translations = JSON.parse(jsonString);
-        
-        // Si on arrive ici, c'est que ça a marché ! On renvoie le résultat.
-        return {
-          fr: text,
-          mg: translations.mg || text,
-          en: translations.en || text,
-          ru: translations.ru || text
-        };
-      }
-
-    } catch (error) {
-      console.error(`Erreur avec ${modelName}:`, error);
-      // On continue vers le modèle suivant
+      return {
+        fr: text,
+        mg: translations.mg || text,
+        en: translations.en || text,
+        ru: translations.ru || text
+      };
+    } else {
+      throw new Error("Pas de JSON valide dans la réponse");
     }
-  }
 
-  // Si on arrive ici, c'est que TOUS les modèles ont échoué
-  alert("Erreur Traduction : Impossible de contacter Google Gemini.");
-  return { fr: text, mg: text, en: text, ru: text };
+  } catch (error: any) {
+    console.error("Erreur Traduction:", error);
+    // On affiche l'erreur technique pour comprendre si ça rate encore
+    alert("Erreur technique : " + error.message);
+    return { fr: text, mg: text, en: text, ru: text };
+  }
 };
 
 // =============================================================================
@@ -118,7 +108,7 @@ interface SiteContent {
   heroSubtitle: LocalizedText;
   heroImageUrl: string;
   aboutText: LocalizedText;
-  commission: { title: LocalizedText; desc: LocalizedText };
+  commission: { title: LocalizedText; desc: LocalizedText; imageUrl: string };
   contactInfo: { whatsapp: string; facebook: string; email: string };
 }
 
@@ -129,8 +119,12 @@ const INITIAL_CONTENT: SiteContent = {
   heroSubtitle: { fr: "Sculptures Uniques à Madagascar", mg: "Sary Sokitra miavaka eto Madagasikara", en: "Unique Sculptures in Madagascar", ru: "Уникальные скульптуры на Мадагаскаре" },
   heroImageUrl: "https://images.unsplash.com/photo-1544531586-fde5298cdd40?q=80&w=1920",
   aboutText: { fr: "Bienvenue...", mg: "Tongasoa...", en: "Welcome...", ru: "Добро пожаловать..." },
-  commission: { title: { fr: "Commandes" }, desc: { fr: "Contactez-moi" } },
-  contactInfo: { whatsapp: "261340000000", facebook: "https://facebook.com", email: "contact@jery.mg" }
+  commission: { 
+    title: { fr: "Commandes" }, 
+    desc: { fr: "Contactez-moi" },
+    imageUrl: "https://images.unsplash.com/photo-1505567745926-ba89000d255a?q=80&w=800"
+  },
+  contactInfo: { whatsapp: "261340000000", facebook: "", email: "" }
 };
 
 const UI_TRANSLATIONS: Record<string, any> = {
@@ -221,7 +215,6 @@ const App = () => {
       const data = await DataService.getAllData();
       if (data) {
         if (data.content) {
-          // Fusion pour être sûr d'avoir tous les champs
           setContent(prev => ({...INITIAL_CONTENT, ...data.content, commission: {...INITIAL_CONTENT.commission, ...data.content.commission}}));
         }
         if (data.sculptures) setSculptures(data.sculptures);
@@ -263,7 +256,7 @@ const App = () => {
     return `${mga} Ar (${priceInEuro} €)`;
   };
 
-  // ECRAN DE CHARGEMENT
+  // --- ECRAN DE CHARGEMENT ---
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -299,6 +292,7 @@ const App = () => {
         </div>
       </nav>
 
+      {/* ZONE PRINCIPALE */}
       <main className="flex-grow w-full">
         {view === 'home' && (
           <>
@@ -336,6 +330,7 @@ const App = () => {
               {sculptures.map(s => (
                 <div key={s.id} className="group">
                   <div className="relative overflow-hidden aspect-square mb-6 bg-stone-200 dark:bg-stone-800 rounded-lg">
+                    {/* On clique sur l'image pour ouvrir le détail */}
                     <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer" onClick={() => setSelectedSculpture(s)} />
                     {!s.available && <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] px-3 py-1 font-bold">{t.gallery.unavailable}</div>}
                   </div>
