@@ -16,69 +16,77 @@ const firebaseConfig = {
   measurementId: "G-J3ZHPF1P5Z"
 };
 
-// TA CLÉ
+// TA CLÉ VALIDE
 const GEMINI_API_KEY = "AIzaSyDFY03-j2_tq1VM-MOV9ruroohEJrddSJc"; 
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (RETOUR AU CLASSIQUE GEMINI-PRO)
+// 2. FONCTION DE TRADUCTION "MULTI-VERSIONS" (POUR EVITER LES ERREURS 404)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
-  try {
-    // ON UTILISE LE MODÈLE 'gemini-pro' QUI EST LE PLUS RÉPANDU
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
-    
-    const prompt = `Traduis : "${text}".
-    Source : Français.
-    Cibles : Malgache (mg), Anglais (en), Russe (ru).
-    IMPORTANT : Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
+  // Liste des URLs à tester l'une après l'autre
+  // On teste d'abord le modèle Flash, puis Pro, puis l'ancienne version v1
+  const urlsToTry = [
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}` // Note le "v1" ici au lieu de "v1beta"
+  ];
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      }),
-    });
+  const prompt = `Traduis : "${text}".
+  Source : Français.
+  Cibles : Malgache (mg), Anglais (en), Russe (ru).
+  Format JSON strict : { "mg": "...", "en": "...", "ru": "..." }`;
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      // On affiche l'erreur exacte dans l'alerte pour comprendre
-      throw new Error(errorData.error?.message || `Erreur HTTP ${response.status}`);
+  // Boucle de tentative
+  for (const url of urlsToTry) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      // Si ça échoue (404 ou autre), on passe au suivant
+      if (!response.ok) {
+        console.warn(`Echec sur ${url}, essai suivant...`);
+        continue; 
+      }
+
+      const data = await response.json();
+      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!textResponse) continue;
+
+      // Nettoyage du JSON
+      const firstBrace = textResponse.indexOf('{');
+      const lastBrace = textResponse.lastIndexOf('}');
+      
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
+        const translations = JSON.parse(jsonString);
+        
+        // Si on arrive ici, c'est gagné !
+        return {
+          fr: text,
+          mg: translations.mg || text,
+          en: translations.en || text,
+          ru: translations.ru || text
+        };
+      }
+    } catch (error) {
+      console.error("Erreur sur une version:", error);
     }
-
-    const data = await response.json();
-    
-    // Gemini Pro renvoie parfois la réponse différemment, on sécurise
-    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!textResponse) throw new Error("Réponse vide de Google");
-
-    // Nettoyage JSON
-    const firstBrace = textResponse.indexOf("{");
-    const lastBrace = textResponse.lastIndexOf("}");
-
-    if (firstBrace !== -1 && lastBrace !== -1) {
-      const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
-      const translations = JSON.parse(jsonString);
-      return {
-        fr: text,
-        mg: translations.mg || text,
-        en: translations.en || text,
-        ru: translations.ru || text,
-      };
-    } else {
-      throw new Error("Format invalide reçu");
-    }
-  } catch (error: any) {
-    console.error("Erreur Traduction:", error);
-    alert("Erreur Google : " + error.message);
-    return { fr: text, mg: text, en: text, ru: text };
   }
+
+  // Si tout échoue vraiment
+  alert("Erreur : Impossible de joindre Google (Vérifiez votre connexion).");
+  return { fr: text, mg: text, en: text, ru: text };
 };
 
 // =============================================================================
@@ -259,7 +267,6 @@ const App = () => {
     return `${mga} Ar (${priceInEuro} €)`;
   };
 
-  // ECRAN DE CHARGEMENT
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -333,7 +340,6 @@ const App = () => {
               {sculptures.map(s => (
                 <div key={s.id} className="group">
                   <div className="relative overflow-hidden aspect-square mb-6 bg-stone-200 dark:bg-stone-800 rounded-lg">
-                    {/* On clique sur l'image pour ouvrir le détail */}
                     <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer" onClick={() => setSelectedSculpture(s)} />
                     {!s.available && <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] px-3 py-1 font-bold">{t.gallery.unavailable}</div>}
                   </div>
