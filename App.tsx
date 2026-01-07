@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, child } from "firebase/database";
-// On importe la librairie officielle
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // =============================================================================
 // 1. CONFIGURATION
@@ -24,41 +22,46 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (AVEC SÉCURITÉ NAVIGATEUR DÉSACTIVÉE)
+// 2. TRADUCTION VIA HTTP DIRECT (SANS SDK) - MÉTHODE INFAILLIBLE
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
   try {
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    // On appelle directement l'API REST de Google. C'est universel.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     
-    // C'EST ICI LA CLÉ DU SUCCÈS : on force le modèle à accepter le navigateur
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+    const prompt = `Agis comme un traducteur JSON.
+    Traduis : "${text}".
+    Source : Français.
+    Cibles : Malgache (mg), Anglais (en), Russe (ru).
+    Format JSON strict : { "mg": "...", "en": "...", "ru": "..." }`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
     });
 
-    const prompt = `Agis comme un système de traduction JSON.
-    Texte à traduire : "${text}"
-    Langue source : Français
-    Langues cibles : Malgache (mg), Anglais (en), Russe (ru)
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || "Erreur Google inconnue");
+    }
+
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!textResponse) throw new Error("Réponse vide de l'IA");
+
+    // Nettoyage pour trouver le JSON
+    const firstBrace = textResponse.indexOf('{');
+    const lastBrace = textResponse.lastIndexOf('}');
     
-    Format de réponse OBLIGATOIRE (JSON pur sans markdown) :
-    { "mg": "...", "en": "...", "ru": "..." }`;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const textResponse = response.text();
-
-    // Nettoyage du JSON (au cas où l'IA ajoute des ```json)
-    const jsonString = textResponse.replace(/```json|```/g, '').trim();
-    
-    // On cherche les accolades pour être sûr
-    const firstBrace = jsonString.indexOf('{');
-    const lastBrace = jsonString.lastIndexOf('}');
-
     if (firstBrace !== -1 && lastBrace !== -1) {
-      const cleanJson = jsonString.substring(firstBrace, lastBrace + 1);
-      const translations = JSON.parse(cleanJson);
+      const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
+      const translations = JSON.parse(jsonString);
 
       return {
         fr: text,
@@ -67,13 +70,14 @@ const generateTranslations = async (text: string) => {
         ru: translations.ru || text
       };
     } else {
-      throw new Error("Pas de JSON valide dans la réponse");
+      // Si l'IA a répondu mais pas en JSON, on garde le texte d'origine
+      console.warn("L'IA n'a pas renvoyé de JSON valide");
+      return { fr: text, mg: text, en: text, ru: text };
     }
 
   } catch (error: any) {
     console.error("Erreur Traduction:", error);
-    // On affiche l'erreur technique pour comprendre si ça rate encore
-    alert("Erreur technique : " + error.message);
+    alert("Problème de traduction : " + error.message);
     return { fr: text, mg: text, en: text, ru: text };
   }
 };
@@ -215,6 +219,7 @@ const App = () => {
       const data = await DataService.getAllData();
       if (data) {
         if (data.content) {
+          // Fusion pour être sûr d'avoir tous les champs
           setContent(prev => ({...INITIAL_CONTENT, ...data.content, commission: {...INITIAL_CONTENT.commission, ...data.content.commission}}));
         }
         if (data.sculptures) setSculptures(data.sculptures);
@@ -256,7 +261,7 @@ const App = () => {
     return `${mga} Ar (${priceInEuro} €)`;
   };
 
-  // --- ECRAN DE CHARGEMENT ---
+  // ECRAN DE CHARGEMENT
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
