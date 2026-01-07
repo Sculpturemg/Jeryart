@@ -16,76 +16,66 @@ const firebaseConfig = {
   measurementId: "G-J3ZHPF1P5Z"
 };
 
-const GEMINI_API_KEY = "AIzaSyDFY03-j2_tq1VM-MOV9ruroohEJrddSJc"; 
+// TA CLÉ ACTUELLE
+const GEMINI_API_KEY = "AIzaSyDFY03-j2_tq1VM-MOV9ruroohEJrddSJc";
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (UTILISE GEMINI 2.0 FLASH EXPERIMENTAL)
+// 2. FONCTION DE TRADUCTION (MÉTHODE HTTP DIRECTE SIMPLIFIÉE)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
-  
-  // ICI : On utilise la liste des VRAIS modèles disponibles aujourd'hui
-  // On commence par le 2.0 Experimental qui résout souvent les bugs du 1.5
-  const modelsToTry = [
-    "gemini-2.0-flash-exp", 
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-latest"
-  ];
 
-  for (const modelName of modelsToTry) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
-      
-      const prompt = `Traduis : "${text}".
-      Source : Français.
-      Cibles : Malgache (mg), Anglais (en), Russe (ru).
-      IMPORTANT : Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
+  try {
+    // URL directe vers le modèle standard 1.5 Flash
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      });
+    const prompt = `Traduis ce texte : "${text}".
+    Source : Français.
+    Cibles : Malgache (mg), Anglais (en), Russe (ru).
+    Format de réponse JSON strict : { "mg": "...", "en": "...", "ru": "..." }`;
 
-      if (!response.ok) {
-        console.warn(`Le modèle ${modelName} a échoué (Erreur ${response.status}), essai du suivant...`);
-        continue; // On passe au modèle suivant dans la liste
-      }
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      }),
+    });
 
-      const data = await response.json();
-      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!textResponse) continue;
-
-      // Nettoyage du JSON
-      const firstBrace = textResponse.indexOf('{');
-      const lastBrace = textResponse.lastIndexOf('}');
-      
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
-        const translations = JSON.parse(jsonString);
-        
-        return {
-          fr: text,
-          mg: translations.mg || text,
-          en: translations.en || text,
-          ru: translations.ru || text
-        };
-      }
-
-    } catch (error) {
-      console.error(`Erreur avec ${modelName}:`, error);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || "Erreur Google inconnue");
     }
-  }
 
-  // Si on arrive ici, c'est que les 3 modèles ont échoué
-  alert("Erreur Traduction : Impossible de joindre l'IA Google (Vérifiez la clé ou la connexion).");
-  return { fr: text, mg: text, en: text, ru: text };
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!textResponse) throw new Error("Réponse vide");
+
+    // Nettoyage JSON (Recherche des accolades)
+    const firstBrace = textResponse.indexOf("{");
+    const lastBrace = textResponse.lastIndexOf("}");
+
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
+      const translations = JSON.parse(jsonString);
+      return {
+        fr: text,
+        mg: translations.mg || text,
+        en: translations.en || text,
+        ru: translations.ru || text,
+      };
+    } else {
+      throw new Error("Format invalide");
+    }
+  } catch (error: any) {
+    console.error("Erreur Traduction:", error);
+    alert("Détail de l'erreur : " + error.message);
+    return { fr: text, mg: text, en: text, ru: text };
+  }
 };
 
 // =============================================================================
@@ -266,7 +256,6 @@ const App = () => {
     return `${mga} Ar (${priceInEuro} €)`;
   };
 
-  // ECRAN DE CHARGEMENT
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
