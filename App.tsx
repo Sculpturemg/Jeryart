@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, child } from "firebase/database";
-// 👇 IMPORTATION DE L'INTELLIGENCE ARTIFICIELLE OFFICIELLE
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // =============================================================================
 // 1. CONFIGURATION
@@ -18,59 +16,76 @@ const firebaseConfig = {
   measurementId: "G-J3ZHPF1P5Z"
 };
 
-const GEMINI_API_KEY = "AIzaSyBP2AVjRM-RE5-J99u-XVODU_-gHl_xpO0"; 
+const GEMINI_API_KEY = "AIzaSyDFY03-j2_tq1VM-MOV9ruroohEJrddSJc"; 
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // =============================================================================
-// 2. FONCTION DE TRADUCTION (VIA LE KIT OFFICIEL GOOGLE)
+// 2. FONCTION DE TRADUCTION (UTILISE GEMINI 2.0 FLASH EXPERIMENTAL)
 // =============================================================================
 const generateTranslations = async (text: string) => {
   if (!text) return { fr: "", mg: "", en: "", ru: "" };
   
-  try {
-    // On initialise l'IA
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    
-    // On récupère le modèle "Flash" (le plus rapide)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // ICI : On utilise la liste des VRAIS modèles disponibles aujourd'hui
+  // On commence par le 2.0 Experimental qui résout souvent les bugs du 1.5
+  const modelsToTry = [
+    "gemini-2.0-flash-exp", 
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest"
+  ];
 
-    const prompt = `Agis comme un traducteur JSON strict.
-    Traduis : "${text}".
-    Source : Français.
-    Cibles : Malgache (mg), Anglais (en), Russe (ru).
-    Format de réponse JSON unique : { "mg": "...", "en": "...", "ru": "..." }`;
+  for (const modelName of modelsToTry) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+      
+      const prompt = `Traduis : "${text}".
+      Source : Français.
+      Cibles : Malgache (mg), Anglais (en), Russe (ru).
+      IMPORTANT : Réponds UNIQUEMENT avec un JSON valide : { "mg": "...", "en": "...", "ru": "..." }`;
 
-    // On lance la génération
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const textResponse = response.text();
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
 
-    // Nettoyage pour extraire le JSON (au cas où l'IA ajoute du texte autour)
-    const firstBrace = textResponse.indexOf('{');
-    const lastBrace = textResponse.lastIndexOf('}');
-    
-    if (firstBrace !== -1 && lastBrace !== -1) {
-      const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
-      const translations = JSON.parse(jsonString);
+      if (!response.ok) {
+        console.warn(`Le modèle ${modelName} a échoué (Erreur ${response.status}), essai du suivant...`);
+        continue; // On passe au modèle suivant dans la liste
+      }
 
-      return {
-        fr: text,
-        mg: translations.mg || text,
-        en: translations.en || text,
-        ru: translations.ru || text
-      };
-    } else {
-      throw new Error("L'IA n'a pas renvoyé de format correct.");
+      const data = await response.json();
+      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!textResponse) continue;
+
+      // Nettoyage du JSON
+      const firstBrace = textResponse.indexOf('{');
+      const lastBrace = textResponse.lastIndexOf('}');
+      
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        const jsonString = textResponse.substring(firstBrace, lastBrace + 1);
+        const translations = JSON.parse(jsonString);
+        
+        return {
+          fr: text,
+          mg: translations.mg || text,
+          en: translations.en || text,
+          ru: translations.ru || text
+        };
+      }
+
+    } catch (error) {
+      console.error(`Erreur avec ${modelName}:`, error);
     }
-
-  } catch (error: any) {
-    console.error("Erreur Traduction:", error);
-    // On affiche l'erreur dans une alerte pour que tu saches ce qui ne va pas
-    alert("Problème IA : " + (error.message || error));
-    return { fr: text, mg: text, en: text, ru: text };
   }
+
+  // Si on arrive ici, c'est que les 3 modèles ont échoué
+  alert("Erreur Traduction : Impossible de joindre l'IA Google (Vérifiez la clé ou la connexion).");
+  return { fr: text, mg: text, en: text, ru: text };
 };
 
 // =============================================================================
@@ -210,7 +225,6 @@ const App = () => {
       const data = await DataService.getAllData();
       if (data) {
         if (data.content) {
-          // Fusion pour être sûr d'avoir tous les champs
           setContent(prev => ({...INITIAL_CONTENT, ...data.content, commission: {...INITIAL_CONTENT.commission, ...data.content.commission}}));
         }
         if (data.sculptures) setSculptures(data.sculptures);
@@ -326,6 +340,7 @@ const App = () => {
               {sculptures.map(s => (
                 <div key={s.id} className="group">
                   <div className="relative overflow-hidden aspect-square mb-6 bg-stone-200 dark:bg-stone-800 rounded-lg">
+                    {/* On clique sur l'image pour ouvrir le détail */}
                     <img src={s.imageUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer" onClick={() => setSelectedSculpture(s)} />
                     {!s.available && <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] px-3 py-1 font-bold">{t.gallery.unavailable}</div>}
                   </div>
